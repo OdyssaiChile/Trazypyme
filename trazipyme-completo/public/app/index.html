@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>TraziPyme — App</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.1/qrcode.js"></script>
+<script src="../shared/config.js"></script>
+<script src="../shared/client.js"></script>
+<style>
+  :root{
+    --green:#2E7D32; --green-dark:#1B5E20; --bg:#F4F6F5; --card:#ffffff;
+    --text:#1B1B1B; --muted:#6B7280; --red:#C0392B; --amber:#B7791F; --radius:16px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
+  #app{max-width:430px;margin:0 auto;min-height:100vh;background:var(--bg);display:flex;flex-direction:column;}
+  .topbar{background:var(--green);color:#fff;padding:18px 20px 14px;display:flex;align-items:center;justify-content:space-between;}
+  .topbar h1{font-size:18px;margin:0;font-weight:700;}
+  .topbar .sub{font-size:12px;opacity:.85;margin-top:2px;}
+  .screen{flex:1;padding:16px;padding-bottom:90px;}
+  .hidden{display:none !important;}
+  .card{background:var(--card);border-radius:var(--radius);padding:18px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:16px;border:none;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer;min-height:64px;}
+  .btn-green{background:var(--green);color:#fff;}
+  .btn-green:active{background:var(--green-dark);}
+  .btn-outline{background:#fff;color:var(--green);border:2px solid var(--green);}
+  .btn-secondary{background:#EEF1F0;color:var(--text);}
+  .btn-red{background:var(--red);color:#fff;}
+  .menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .menu-tile{background:var(--card);border-radius:var(--radius);padding:22px 10px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer;}
+  .menu-tile .icon{font-size:30px;margin-bottom:8px;}
+  .menu-tile .label{font-size:13px;font-weight:600;}
+  input,select{width:100%;padding:13px;border-radius:10px;border:1px solid #DADDE0;font-size:15px;margin-bottom:10px;background:#fff;}
+  label{font-size:12px;color:var(--muted);font-weight:600;display:block;margin-bottom:4px;}
+  .field{margin-bottom:12px;}
+  .keypad{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+  #qr-video{width:100%;border-radius:var(--radius);background:#000;aspect-ratio:1/1;object-fit:cover;}
+  .scan-box{position:relative;}
+  .scan-overlay{position:absolute;inset:0;border:3px solid #fff;border-radius:var(--radius);box-shadow:0 0 0 999px rgba(0,0,0,.35);margin:15%;pointer-events:none;}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;color:#fff;}
+  .badge-green{background:var(--green);}
+  .badge-amber{background:var(--amber);}
+  .badge-red{background:var(--red);}
+  .bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:#fff;display:flex;border-top:1px solid #E5E7EB;}
+  .nav-item{flex:1;text-align:center;padding:10px 0 8px;font-size:11px;color:var(--muted);cursor:pointer;}
+  .nav-item.active{color:var(--green);font-weight:700;}
+  .nav-item .ic{font-size:20px;display:block;}
+  .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1B1B1B;color:#fff;padding:12px 20px;border-radius:30px;font-size:14px;max-width:380px;text-align:center;z-index:50;}
+  .row{display:flex;gap:10px;}
+  .row > *{flex:1;}
+  .hist-item{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #F0F1F2;font-size:13px;}
+  .hist-item .h-main{font-weight:600;}
+  .hist-item .h-sub{color:var(--muted);font-size:12px;}
+  #qr-canvas-display{display:flex;justify-content:center;margin:14px 0;}
+  .center{text-align:center;}
+  h2{font-size:16px;margin:0 0 12px;}
+  .muted{color:var(--muted);font-size:13px;}
+  .error-text{color:var(--red);font-size:13px;margin:-4px 0 10px;min-height:16px;}
+  #qr-print-area{display:none;}
+  .qrs-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .qrs-card{background:var(--card);border-radius:12px;padding:12px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer;}
+  .qrs-card canvas{width:100%;height:auto;}
+  .qrs-card .qn{font-weight:600;font-size:12px;margin-top:6px;}
+  .qrs-card .qc{color:var(--muted);font-size:11px;}
+  .qrs-card.alerta{outline:2px solid var(--red);}
+  .badge-red-soft{background:#FBE1DE;color:var(--red);font-weight:700;padding:3px 9px;border-radius:20px;font-size:11px;display:inline-block;margin-right:4px;}
+  @media print{
+    body *{visibility:hidden;}
+    #qr-print-area{display:block !important;visibility:visible;position:absolute;top:0;left:0;width:100%;text-align:center;padding:50px 20px;}
+    #qr-print-area *{visibility:visible;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- LOGIN -->
+  <div id="screen-login" class="screen" style="display:flex;flex-direction:column;justify-content:center;align-items:center;padding-top:60px;">
+    <div class="center" style="margin-bottom:18px;">
+      <div style="font-size:40px;">📦</div>
+      <h1 style="font-size:22px;color:var(--green);margin:6px 0 2px;">TraziPyme</h1>
+      <div class="muted">Inventario simple para tu bodega</div>
+    </div>
+    <div style="width:100%;max-width:300px;">
+      <div class="field"><label>Correo</label><input id="login-email" type="email" placeholder="tu@empresa.cl" autocomplete="username"></div>
+      <div class="field"><label>Contraseña</label><input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password"></div>
+      <div class="error-text" id="login-error"></div>
+      <button class="btn btn-green" onclick="doLogin()">Ingresar</button>
+    </div>
+  </div>
+
+  <!-- SUSCRIPCIÓN VENCIDA -->
+  <div id="screen-bloqueo" class="screen hidden center" style="padding-top:80px;">
+    <div style="font-size:44px;">🔒</div>
+    <h2>Suscripción no activa</h2>
+    <p class="muted">Tu empresa no tiene una suscripción activa a TraziPyme. Contacta a Odyssai para reactivarla.</p>
+    <button class="btn btn-secondary" onclick="logout()">Cerrar sesión</button>
+  </div>
+
+  <!-- HOME -->
+  <div id="screen-home" class="screen hidden">
+    <div class="topbar" style="margin:-16px -16px 16px;">
+      <div><h1 id="home-greeting">Hola</h1><div class="sub" id="home-bodega-label">Bodega Central</div></div>
+      <div onclick="logout()" style="cursor:pointer;">🚪</div>
+    </div>
+    <div class="field">
+      <label>Bodega activa</label>
+      <select id="select-bodega" onchange="onBodegaChange()"></select>
+    </div>
+    <div class="menu-grid">
+      <div class="menu-tile" onclick="showScreen('scan')"><div class="icon">📷</div><div class="label">Escanear QR</div></div>
+      <div class="menu-tile" onclick="showScreen('crear')"><div class="icon">➕</div><div class="label">Crear QR</div></div>
+      <div class="menu-tile" onclick="showScreen('historial')"><div class="icon">🕓</div><div class="label">Historial</div></div>
+      <div class="menu-tile" onclick="undoLast()"><div class="icon">↩️</div><div class="label">Deshacer último escaneo</div></div>
+    </div>
+    <div class="card" style="margin-top:14px;">
+      <h2>Resumen rápido</h2>
+      <div id="home-resumen" class="muted">Cargando...</div>
+    </div>
+  </div>
+
+  <!-- SCAN -->
+  <div id="screen-scan" class="screen hidden">
+    <h2>Escanear producto</h2>
+    <div class="scan-box">
+      <video id="qr-video" autoplay playsinline></video>
+      <div class="scan-overlay"></div>
+    </div>
+    <div class="muted center" style="margin:10px 0;">Apunta la cámara al código QR del producto</div>
+    <div class="card">
+      <label>O ingresa el código manualmente</label>
+      <input id="manual-code" placeholder="Ej: JER-001">
+      <button class="btn btn-outline" onclick="buscarManual()">Buscar producto</button>
+    </div>
+    <button class="btn btn-secondary" onclick="showScreen('home')">Cancelar</button>
+  </div>
+
+  <!-- CONFIRM MOVIMIENTO -->
+  <div id="screen-confirmar" class="screen hidden">
+    <h2>Registrar movimiento</h2>
+    <div class="card" id="producto-info"></div>
+    <button class="btn btn-outline" style="margin-bottom:14px;" onclick="imprimirQRConfirmado()">🖨️ Ver / imprimir QR</button>
+    <div class="field">
+      <label>Tipo de movimiento</label>
+      <select id="tipo-movimiento" onchange="onTipoChange()">
+        <option value="ENTRADA">Entrada</option>
+        <option value="SALIDA">Salida</option>
+        <option value="MUESTRA">Salida por muestra (sin venta)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Cantidad</label>
+      <input id="cantidad-movimiento" type="number" min="1" value="1">
+    </div>
+    <div id="campos-muestra" class="hidden">
+      <div class="field"><label>Responsable del retiro</label><input id="responsable-muestra" placeholder="Nombre"></div>
+      <div class="field"><label>Destino de la muestra</label><input id="destino-muestra" placeholder="Ej: Cliente / control de calidad"></div>
+    </div>
+    <button class="btn btn-green" id="btn-confirmar" onclick="confirmarMovimiento()">✓ Confirmar</button>
+    <button class="btn btn-secondary" style="margin-top:10px;" onclick="showScreen('home')">Cancelar</button>
+  </div>
+
+  <!-- CREAR QR -->
+  <div id="screen-crear" class="screen hidden">
+    <h2>Crear producto y generar QR</h2>
+    <div class="card">
+      <div class="field"><label>Nombre del producto</label><input id="c-nombre" placeholder="Ej: Guantes nitrilo talla M"></div>
+      <div class="row">
+        <div class="field"><label>Código interno</label><input id="c-codigo" placeholder="Ej: GUA-010" onblur="sugerirPrecioPorCodigo()"></div>
+        <div class="field"><label>Unidad de medida</label><input id="c-unidad" placeholder="caja / unidad"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Número de lote (auto: año-semana actual)</label><input id="c-lote" placeholder="Ej: L2026-26"></div>
+        <div class="field"><label>Fecha de vencimiento</label><input id="c-vencimiento" type="date"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Precio de costo (CLP)</label><input id="c-precio" type="number" min="0" placeholder="0"></div>
+        <div class="field"><label>Stock mínimo</label><input id="c-stockmin" type="number" min="0" value="5"></div>
+      </div>
+      <div class="field"><label>Stock inicial (unidades que ingresan ahora)</label><input id="c-stock-inicial" type="number" min="0" value="0"></div>
+      <button class="btn btn-green" onclick="crearProducto()">Generar QR</button>
+    </div>
+    <div id="qr-resultado" class="card hidden">
+      <div class="center" id="qr-canvas-display"></div>
+      <div class="center muted" id="qr-label"></div>
+      <button class="btn btn-outline" style="margin-top:10px;" onclick="imprimirQRCreado()">🖨️ Imprimir sticker</button>
+    </div>
+    <button class="btn btn-secondary" onclick="showScreen('home')">Volver</button>
+  </div>
+
+  <!-- HISTORIAL -->
+  <div id="screen-historial" class="screen hidden">
+    <h2>Historial de movimientos</h2>
+    <div class="card" id="historial-list">Cargando...</div>
+    <button class="btn btn-secondary" onclick="showScreen('home')">Volver</button>
+  </div>
+
+  <!-- QRS CREADOS -->
+  <div id="screen-qrs" class="screen hidden">
+    <h2>QRs creados en esta bodega</h2>
+    <input id="qrs-buscar" placeholder="Buscar por nombre o código..." oninput="renderQRsApp()" style="margin-bottom:12px;">
+    <div class="qrs-grid" id="qrs-grid"></div>
+    <button class="btn btn-secondary" style="margin-top:14px;" onclick="showScreen('home')">Volver</button>
+  </div>
+
+  <!-- DETALLE DE PRODUCTO (solo lectura + acceso rápido a registrar movimiento) -->
+  <div id="screen-detalle" class="screen hidden">
+    <h2 id="det-nombre">Producto</h2>
+    <div class="card">
+      <div class="muted">Código: <span id="det-codigo"></span> · Lote: <span id="det-lote"></span></div>
+      <div style="font-size:22px;font-weight:700;margin-top:8px;" id="det-stock"></div>
+      <div id="det-badges" style="margin-top:8px;"></div>
+    </div>
+    <button class="btn btn-green" onclick="registrarDesdeDetalle()">Registrar movimiento</button>
+    <div class="card" style="margin-top:14px;">
+      <label>Historial reciente</label>
+      <div id="det-historial"></div>
+    </div>
+    <button class="btn btn-secondary" style="margin-top:10px;" onclick="showScreen('qrs')">Volver</button>
+  </div>
+
+  <div id="qr-print-area"></div>
+
+  <div class="bottom-nav hidden" id="bottom-nav">
+    <div class="nav-item" onclick="showScreen('home')"><span class="ic">🏠</span>Inicio</div>
+    <div class="nav-item" onclick="showScreen('scan')"><span class="ic">📷</span>Escanear</div>
+    <div class="nav-item" onclick="showScreen('crear')"><span class="ic">➕</span>Crear</div>
+    <div class="nav-item" onclick="showScreen('qrs')"><span class="ic">🔳</span>QRs</div>
+    <div class="nav-item" onclick="showScreen('historial')"><span class="ic">🕓</span>Historial</div>
+  </div>
+</div>
+
+<script>
+let perfil = null; // {id, nombre, role, tenant_id, tenant}
+let bodegas = [];
+let bodegaActual = null;
+let productoEscaneado = null;
+let productoCreado = null;
+let stream = null;
+let scanLoop = null;
+let prefillOverride = null;
+
+async function boot(){
+  const p = await trazi_getProfile();
+  if(!p){ showScreen('login'); return; }
+  await afterLogin(p);
+}
+
+async function doLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  if(!email || !password){ errEl.textContent = 'Ingresa correo y contraseña'; return; }
+  try{
+    await trazi_login(email, password);
+    const p = await trazi_getProfile();
+    if(!p){ errEl.textContent = 'No se encontró un perfil para este usuario'; await trazi_logout(); return; }
+    await afterLogin(p);
+  }catch(e){
+    errEl.textContent = 'Correo o contraseña incorrectos';
+  }
+}
+
+async function afterLogin(p){
+  perfil = p;
+  if(!trazi_subscriptionOk(perfil.tenant)){
+    showScreen('bloqueo');
+    return;
+  }
+  await loadBodegas();
+  document.getElementById('home-greeting').textContent = 'Hola, ' + perfil.nombre.split(' ')[0];
+  showScreen('home');
+  document.getElementById('bottom-nav').classList.remove('hidden');
+}
+
+async function logout(){
+  await trazi_logout();
+  perfil = null;
+  document.getElementById('bottom-nav').classList.add('hidden');
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-password').value = '';
+  showScreen('login');
+}
+
+async function loadBodegas(){
+  const { data, error } = await sb.from('bodegas').select('*').eq('activo', true).order('nombre');
+  bodegas = data || [];
+  const sel = document.getElementById('select-bodega');
+  sel.innerHTML = bodegas.map(b=>`<option value="${b.id}">${b.nombre}</option>`).join('');
+  bodegaActual = bodegas[0]?.id;
+  onBodegaChange();
+}
+function onBodegaChange(){
+  bodegaActual = document.getElementById('select-bodega').value;
+  const b = bodegas.find(x=>x.id===bodegaActual);
+  document.getElementById('home-bodega-label').textContent = b ? b.nombre : '';
+  loadResumen();
+}
+
+async function loadResumen(){
+  const { data } = await sb.from('productos_con_estado').select('*').eq('bodega_id', bodegaActual);
+  const productos = data || [];
+  const totalSkus = productos.length;
+  const unidades = productos.reduce((s,p)=>s+p.stock_actual,0);
+  const valor = productos.reduce((s,p)=>s+Number(p.valor_inventario),0);
+  const alertas = productos.filter(p=>p.stock_bajo || p.vencimiento_proximo).length;
+  document.getElementById('home-resumen').innerHTML =
+    `${totalSkus} SKUs · ${unidades} unidades · ${trazi_fmtCLP(valor)} en inventario` +
+    (alertas>0 ? `<br><span class="badge badge-amber" style="margin-top:6px;">${alertas} alertas activas</span>` : '');
+}
+
+function showScreen(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
+  document.getElementById('screen-'+name).classList.remove('hidden');
+  if(name==='home') loadResumen();
+  if(name==='scan') startScanner();
+  else stopScanner();
+  if(name==='historial') loadHistorial();
+  if(name==='crear') prefillCrear();
+  if(name==='qrs') cargarQRsApp();
+}
+
+function loteActual(){
+  const hoy = new Date();
+  const d = new Date(Date.UTC(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()));
+  const diaSemana = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - diaSemana);
+  const inicioAno = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const semana = Math.ceil((((d - inicioAno) / 86400000) + 1) / 7);
+  return `L${d.getUTCFullYear()}-${String(semana).padStart(2,'0')}`;
+}
+
+async function prefillCrear(){
+  document.getElementById('qr-resultado').classList.add('hidden');
+  if(prefillOverride){
+    const o = prefillOverride; prefillOverride = null;
+    document.getElementById('c-nombre').value = o.nombre || '';
+    document.getElementById('c-codigo').value = o.codigo_interno || '';
+    document.getElementById('c-unidad').value = o.unidad_medida || 'unidad';
+    document.getElementById('c-precio').value = o.precio_costo || '';
+    document.getElementById('c-stockmin').value = o.stock_minimo || 5;
+    document.getElementById('c-lote').value = loteActual();
+    document.getElementById('c-vencimiento').value = '';
+    document.getElementById('c-stock-inicial').value = 0;
+    return;
+  }
+  document.getElementById('c-nombre').value = '';
+  document.getElementById('c-codigo').value = '';
+  document.getElementById('c-precio').value = '';
+  document.getElementById('c-stock-inicial').value = 0;
+  document.getElementById('c-vencimiento').value = '';
+  document.getElementById('c-lote').value = loteActual();
+  const { data: productos } = await sb.from('productos').select('*').eq('bodega_id', bodegaActual);
+  if(productos && productos.length){
+    const conteoUnidad = {};
+    let sumaStockMin = 0;
+    for(const p of productos){
+      conteoUnidad[p.unidad_medida] = (conteoUnidad[p.unidad_medida]||0) + 1;
+      sumaStockMin += p.stock_minimo;
+    }
+    const unidadDefault = Object.keys(conteoUnidad).sort((a,b)=>conteoUnidad[b]-conteoUnidad[a])[0];
+    document.getElementById('c-unidad').value = unidadDefault || 'unidad';
+    document.getElementById('c-stockmin').value = Math.round(sumaStockMin / productos.length) || 5;
+  } else {
+    document.getElementById('c-unidad').value = 'unidad';
+    document.getElementById('c-stockmin').value = 5;
+  }
+}
+
+async function sugerirPrecioPorCodigo(){
+  const codigo = document.getElementById('c-codigo').value.trim();
+  if(!codigo) return;
+  const { data: arr } = await sb.from('productos').select('*').eq('codigo_interno', codigo).order('creado_en', {ascending:true});
+  if(!arr || !arr.length) return;
+  const ref = arr[arr.length - 1];
+  if(!document.getElementById('c-nombre').value) document.getElementById('c-nombre').value = ref.nombre;
+  document.getElementById('c-unidad').value = ref.unidad_medida;
+  document.getElementById('c-precio').value = ref.precio_costo;
+  document.getElementById('c-stockmin').value = ref.stock_minimo;
+  toast(`💡 Precio sugerido: ${trazi_fmtCLP(ref.precio_costo)} (según "${ref.nombre}" ya registrado)`);
+}
+
+async function imprimirQR(nombre, codigo, lote){
+  const area = document.getElementById('qr-print-area');
+  area.innerHTML = '';
+  const canvas = document.createElement('canvas');
+  await QRCode.toCanvas(canvas, codigo, {width:220, color:{dark:'#1B1B1B', light:'#ffffff'}});
+  area.appendChild(canvas);
+  const info = document.createElement('div');
+  info.style.marginTop = '10px';
+  info.style.fontFamily = 'sans-serif';
+  info.innerHTML = `<div style="font-weight:700;font-size:16px;">${nombre}</div><div style="font-size:13px;">${codigo}${lote ? ' · Lote: '+lote : ''}</div>`;
+  area.appendChild(info);
+  setTimeout(()=>window.print(), 80);
+}
+function imprimirQRCreado(){ if(productoCreado) imprimirQR(productoCreado.nombre, productoCreado.codigo, productoCreado.lote); }
+function imprimirQRConfirmado(){ if(productoEscaneado) imprimirQR(productoEscaneado.nombre, productoEscaneado.codigo_interno, productoEscaneado.lote); }
+
+async function startScanner(){
+  const video = document.getElementById('qr-video');
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    video.srcObject = stream;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    scanLoop = setInterval(()=>{
+      if(video.readyState !== video.HAVE_ENOUGH_DATA) return;
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const img = ctx.getImageData(0,0,canvas.width,canvas.height);
+      const code = jsQR(img.data, img.width, img.height);
+      if(code){ stopScanner(); buscarProducto(code.data); }
+    }, 350);
+  }catch(e){
+    document.querySelector('.scan-box').innerHTML = '<div class="card muted">No se pudo acceder a la cámara. Usa el código manual abajo.</div>';
+  }
+}
+function stopScanner(){
+  if(scanLoop){ clearInterval(scanLoop); scanLoop=null; }
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+}
+function buscarManual(){
+  const code = document.getElementById('manual-code').value.trim();
+  if(code) buscarProducto(code);
+}
+async function buscarProducto(codigo){
+  const { data: arr } = await sb.from('productos').select('*').eq('codigo_interno', codigo).eq('bodega_id', bodegaActual);
+  if(arr && arr.length){
+    productoEscaneado = arr[0];
+    document.getElementById('producto-info').innerHTML = `
+      <div style="font-weight:700;font-size:16px;">${productoEscaneado.nombre}</div>
+      <div class="muted">Código: ${productoEscaneado.codigo_interno} · Lote: ${productoEscaneado.lote||'s/n'}</div>
+      <div class="muted">Stock actual: ${productoEscaneado.stock_actual} ${productoEscaneado.unidad_medida}</div>
+    `;
+    onTipoChange();
+    showScreen('confirmar');
+    return;
+  }
+  await ofrecerCrearDesdeOtraBodega(codigo);
+}
+
+async function ofrecerCrearDesdeOtraBodega(codigo){
+  const { data: arrAny } = await sb.from('productos').select('*').eq('codigo_interno', codigo).order('creado_en', {ascending:true});
+  if(!arrAny || !arrAny.length){ toast('QR no reconocido: producto no encontrado'); return; }
+  const ref = arrAny[arrAny.length - 1];
+  const origen = bodegas.find(b => b.id === ref.bodega_id);
+  prefillOverride = ref;
+  showScreen('crear');
+  toast(`📦 Este QR pertenece a "${origen ? origen.nombre : 'otra sucursal'}". Completa y genera el QR para esta bodega.`);
+}
+function onTipoChange(){
+  const tipo = document.getElementById('tipo-movimiento').value;
+  document.getElementById('campos-muestra').classList.toggle('hidden', tipo !== 'MUESTRA');
+}
+async function confirmarMovimiento(){
+  const tipo = document.getElementById('tipo-movimiento').value;
+  const cantidad = Number(document.getElementById('cantidad-movimiento').value);
+  const { data, error } = await sb.rpc('registrar_movimiento', {
+    p_producto_id: productoEscaneado.id, p_tipo: tipo, p_cantidad: cantidad,
+    p_responsable_muestra: document.getElementById('responsable-muestra').value || null,
+    p_destino_muestra: document.getElementById('destino-muestra').value || null,
+  });
+  if(error){ toast(error.message || 'Error al registrar'); return; }
+  toast('✓ Movimiento registrado');
+  showScreen('home');
+}
+async function undoLast(){
+  const { data: mov } = await sb.from('movimientos').select('*, productos(nombre)')
+    .eq('operario_id', perfil.id).eq('deshecho', false).order('fecha', {ascending:false}).limit(1).maybeSingle();
+  if(!mov){ toast('No hay movimientos recientes'); return; }
+  const { error } = await sb.rpc('deshacer_movimiento', { p_movimiento_id: mov.id });
+  if(error){ toast(error.message); return; }
+  toast('↩️ Último escaneo deshecho (' + mov.productos.nombre + ')');
+  loadResumen();
+}
+
+async function crearProducto(){
+  const nombre = document.getElementById('c-nombre').value;
+  const codigo_interno = document.getElementById('c-codigo').value;
+  const unidad_medida = document.getElementById('c-unidad').value;
+  if(!nombre || !codigo_interno || !unidad_medida){ toast('Completa nombre, código y unidad'); return; }
+  const { data: producto_id, error } = await sb.rpc('crear_producto', {
+    p_bodega_id: bodegaActual, p_codigo_interno: codigo_interno, p_nombre: nombre, p_unidad_medida: unidad_medida,
+    p_lote: document.getElementById('c-lote').value || null,
+    p_fecha_vencimiento: document.getElementById('c-vencimiento').value || null,
+    p_precio_costo: Number(document.getElementById('c-precio').value || 0),
+    p_stock_minimo: Number(document.getElementById('c-stockmin').value || 5),
+    p_stock_inicial: Number(document.getElementById('c-stock-inicial').value || 0),
+  });
+  if(error){ toast(error.message || 'Error'); return; }
+  const div = document.getElementById('qr-canvas-display');
+  div.innerHTML='';
+  const canvas = document.createElement('canvas');
+  await QRCode.toCanvas(canvas, codigo_interno, {width:200, color:{dark:'#1B1B1B', light:'#ffffff'}});
+  div.appendChild(canvas);
+  document.getElementById('qr-label').textContent = `${nombre} — ${codigo_interno}`;
+  document.getElementById('qr-resultado').classList.remove('hidden');
+  productoCreado = { nombre, codigo: codigo_interno, lote: document.getElementById('c-lote').value };
+  toast('✓ Producto y QR generados — ya disponible en bodega, historial y dashboard');
+  loadResumen();
+}
+
+async function loadHistorial(){
+  const { data: arr } = await sb.from('movimientos').select('*, productos!inner(nombre, bodega_id)')
+    .eq('deshecho', false).eq('productos.bodega_id', bodegaActual).order('fecha', {ascending:false}).limit(30);
+  const tipoLabel = {ENTRADA:'Entrada', SALIDA:'Salida', MUESTRA:'Muestra'};
+  document.getElementById('historial-list').innerHTML = (arr && arr.length) ? arr.map(m=>`
+    <div class="hist-item">
+      <div>
+        <div class="h-main">${m.productos.nombre}</div>
+        <div class="h-sub">${m.operario_nombre} · ${new Date(m.fecha).toLocaleString('es-CL')}</div>
+      </div>
+      <div class="badge ${m.tipo==='ENTRADA'?'badge-green':m.tipo==='MUESTRA'?'badge-amber':'badge-red'}">${tipoLabel[m.tipo]} ${m.cantidad}</div>
+    </div>
+  `).join('') : '<div class="muted">Sin movimientos aún</div>';
+}
+
+let productosQRApp = [];
+async function cargarQRsApp(){
+  const { data } = await sb.from('productos_con_estado').select('*').eq('bodega_id', bodegaActual);
+  productosQRApp = data || [];
+  renderQRsApp();
+}
+function renderQRsApp(){
+  const filtro = (document.getElementById('qrs-buscar').value || '').toLowerCase().trim();
+  const lista = !filtro ? productosQRApp : productosQRApp.filter(p => p.nombre.toLowerCase().includes(filtro) || p.codigo_interno.toLowerCase().includes(filtro));
+  const cont = document.getElementById('qrs-grid');
+  if(!lista.length){ cont.innerHTML = '<div class="muted">Sin productos para mostrar</div>'; return; }
+  cont.innerHTML = lista.map(p => `
+    <div class="qrs-card ${(p.stock_bajo||p.vencimiento_proximo)?'alerta':''}" onclick="abrirDetalleApp('${p.id}')">
+      <canvas id="qrsc-${p.id}"></canvas>
+      <div class="qn">${p.nombre}</div>
+      <div class="qc">${p.codigo_interno}${p.lote ? ' · '+p.lote : ''}</div>
+    </div>`).join('');
+  lista.forEach(p => { const c = document.getElementById('qrsc-'+p.id); if(c) QRCode.toCanvas(c, p.codigo_interno, {width:110, color:{dark:'#1B1B1B', light:'#ffffff'}}); });
+}
+
+let detalleProductoId = null;
+async function abrirDetalleApp(productoId){
+  detalleProductoId = productoId;
+  const { data: p, error } = await sb.from('productos_con_estado').select('*').eq('id', productoId).single();
+  if(error || !p){ toast('No se pudo cargar el producto'); return; }
+  productoEscaneado = p;
+
+  document.getElementById('det-nombre').textContent = p.nombre;
+  document.getElementById('det-codigo').textContent = p.codigo_interno;
+  document.getElementById('det-lote').textContent = p.lote || 's/n';
+  document.getElementById('det-stock').textContent = `Stock: ${p.stock_actual} ${p.unidad_medida}`;
+
+  const badges = [];
+  if(p.stock_bajo) badges.push('<span class="badge-red-soft">📉 Stock bajo el mínimo</span>');
+  if(p.vencimiento_proximo) badges.push(`<span class="badge-red-soft">⏰ Vence en ${p.dias_para_vencer} día(s)</span>`);
+  document.getElementById('det-badges').innerHTML = badges.join('');
+
+  const { data: hist } = await sb.from('movimientos').select('*').eq('producto_id', productoId).order('fecha', {ascending:false}).limit(10);
+  const tipoLabel = {ENTRADA:'Entrada', SALIDA:'Salida', MUESTRA:'Muestra'};
+  document.getElementById('det-historial').innerHTML = (hist && hist.length) ? hist.map(m=>`
+    <div class="hist-item">
+      <div><div class="h-main">${tipoLabel[m.tipo]}${m.deshecho?' (deshecho)':''}</div><div class="h-sub">${m.operario_nombre} · ${new Date(m.fecha).toLocaleString('es-CL')}</div></div>
+      <div class="badge ${m.tipo==='ENTRADA'?'badge-green':m.tipo==='MUESTRA'?'badge-amber':'badge-red'}">${m.cantidad}</div>
+    </div>`).join('') : '<div class="muted">Sin movimientos aún</div>';
+
+  showScreen('detalle');
+}
+
+function registrarDesdeDetalle(){
+  if(!productoEscaneado) return;
+  document.getElementById('producto-info').innerHTML = `
+    <div style="font-weight:700;font-size:16px;">${productoEscaneado.nombre}</div>
+    <div class="muted">Código: ${productoEscaneado.codigo_interno} · Lote: ${productoEscaneado.lote||'s/n'}</div>
+    <div class="muted">Stock actual: ${productoEscaneado.stock_actual} ${productoEscaneado.unidad_medida}</div>
+  `;
+  onTipoChange();
+  showScreen('confirmar');
+}
+
+function toast(msg){
+  const t = document.createElement('div');
+  t.className='toast'; t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 2200);
+}
+
+boot();
+</script>
+</body>
+</html>
