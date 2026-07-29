@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TraziPyme — Panel Odyssai</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="../shared/config.js"></script>
+<script src="../shared/client.js"></script>
+<style>
+  :root{ --green:#2E7D32; --bg:#F4F6F5; --card:#fff; --text:#1B1B1B; --muted:#6B7280; --red:#C0392B; --amber:#B7791F; --border:#E5E7EB; }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
+  header{background:#1B1B1B;color:#fff;padding:16px 28px;}
+  header h1{font-size:19px;margin:0;}
+  main{max-width:1000px;margin:0 auto;padding:24px 20px 60px;}
+  .hidden{display:none !important;}
+  .card{background:var(--card);border-radius:14px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:18px;}
+  .card h2{font-size:15px;margin:0 0 14px;}
+  input,select{width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);font-size:13px;margin-bottom:10px;}
+  label{font-size:11px;color:var(--muted);font-weight:600;display:block;margin-bottom:3px;}
+  .row{display:flex;gap:10px;}
+  .row > *{flex:1;}
+  .btn{padding:11px 16px;border-radius:8px;border:1px solid var(--border);background:#fff;font-size:13px;font-weight:600;cursor:pointer;}
+  .btn-primary{background:var(--green);color:#fff;border-color:var(--green);width:100%;padding:13px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--border);font-size:11px;text-transform:uppercase;}
+  td{padding:8px 8px;border-bottom:1px solid #F0F1F2;}
+  .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;color:#fff;}
+  .badge-green{background:var(--green);} .badge-amber{background:var(--amber);} .badge-red{background:var(--red);} .badge-grey{background:var(--muted);}
+  .error{color:var(--red);font-size:13px;margin:6px 0;}
+  .ok-box{background:#EAF6EC;border:1px solid #BFE3C4;border-radius:10px;padding:14px;font-size:13px;margin-top:10px;word-break:break-all;}
+  #screen-login{max-width:340px;margin:100px auto;text-align:center;}
+  #screen-sin-permiso{max-width:420px;margin:100px auto;text-align:center;}
+</style>
+</head>
+<body>
+
+<div id="screen-login" class="hidden">
+  <div style="font-size:40px;">🛠️</div>
+  <h1>Panel Odyssai</h1>
+  <div class="card" style="text-align:left;">
+    <label>Correo</label><input id="login-email" type="email" placeholder="admin@odyssai.cl">
+    <label>Contraseña</label><input id="login-password" type="password" placeholder="••••••••">
+    <div class="error" id="login-error"></div>
+    <button class="btn btn-primary" onclick="doLogin()">Ingresar</button>
+  </div>
+</div>
+
+<div id="screen-sin-permiso" class="hidden">
+  <div style="font-size:44px;">🚫</div>
+  <h2>Acceso restringido</h2>
+  <p style="color:var(--muted);">Este panel es solo para el equipo de Odyssai (rol super_admin).</p>
+  <button class="btn" onclick="logout()">Cerrar sesión</button>
+</div>
+
+<div id="screen-app" class="hidden">
+<header><h1>🛠️ Panel Odyssai — Clientes TraziPyme</h1></header>
+<main>
+  <div class="card">
+    <h2>Nuevo cliente (onboarding)</h2>
+    <div class="row">
+      <div><label>Nombre de la empresa</label><input id="ob-nombre" placeholder="Comercial AyB SpA"></div>
+      <div><label>RUT (opcional)</label><input id="ob-rut" placeholder="76.000.000-0"></div>
+    </div>
+    <div class="row">
+      <div><label>Nombre del dueño/a</label><input id="ob-owner-nombre" placeholder="Carolina Pérez"></div>
+      <div><label>Correo del dueño/a</label><input id="ob-owner-email" type="email" placeholder="carolina@empresa.cl"></div>
+    </div>
+    <div class="row">
+      <div><label>Plan</label>
+        <select id="ob-plan"><option value="starter">Starter</option><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select>
+      </div>
+      <div><label>Stripe Price ID (opcional — deja vacío para solo trial)</label><input id="ob-price" placeholder="price_..."></div>
+    </div>
+    <div class="error" id="ob-error"></div>
+    <button class="btn btn-primary" onclick="crearCliente()">Crear cliente</button>
+    <div id="ob-resultado"></div>
+  </div>
+
+  <div class="card">
+    <h2>Clientes existentes</h2>
+    <table>
+      <thead><tr><th>Empresa</th><th>Plan</th><th>Estado</th><th>Prueba/próx. cobro</th></tr></thead>
+      <tbody id="tabla-tenants"><tr><td colspan="4" style="color:var(--muted);">Cargando...</td></tr></tbody>
+    </table>
+  </div>
+</main>
+</div>
+
+<script>
+let perfil = null;
+
+async function boot(){
+  const p = await trazi_getProfile();
+  if(!p){ show('login'); return; }
+  if(p.role !== 'super_admin'){ show('sin-permiso'); return; }
+  perfil = p;
+  show('app');
+  cargarTenants();
+}
+function show(name){
+  ['login','sin-permiso','app'].forEach(n=>document.getElementById('screen-'+n)?.classList.add('hidden'));
+  document.getElementById('screen-'+name)?.classList.remove('hidden');
+}
+async function doLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  try{ await trazi_login(email, password); await boot(); }
+  catch(e){ errEl.textContent = 'Correo o contraseña incorrectos'; }
+}
+async function logout(){ await trazi_logout(); perfil = null; show('login'); }
+
+async function cargarTenants(){
+  const { data, error } = await sb.from('tenants').select('*').order('created_at', {ascending:false});
+  const statusBadge = { trialing:'badge-amber', active:'badge-green', past_due:'badge-red', canceled:'badge-grey', incomplete:'badge-grey' };
+  document.getElementById('tabla-tenants').innerHTML = (data && data.length) ? data.map(t=>`
+    <tr>
+      <td>${t.nombre}</td>
+      <td class="muted">${t.plan}</td>
+      <td><span class="badge ${statusBadge[t.subscription_status]||'badge-grey'}">${t.subscription_status}</span></td>
+      <td class="muted">${t.subscription_status==='trialing' ? 'Prueba hasta '+new Date(t.trial_ends_at).toLocaleDateString('es-CL') : (t.current_period_end ? new Date(t.current_period_end).toLocaleDateString('es-CL') : '—')}</td>
+    </tr>`).join('') : '<tr><td colspan="4" style="color:var(--muted);">Sin clientes todavía</td></tr>';
+}
+
+async function crearCliente(){
+  const body = {
+    tenant_nombre: document.getElementById('ob-nombre').value.trim(),
+    tenant_rut: document.getElementById('ob-rut').value.trim() || null,
+    plan: document.getElementById('ob-plan').value,
+    owner_nombre: document.getElementById('ob-owner-nombre').value.trim(),
+    owner_email: document.getElementById('ob-owner-email').value.trim(),
+    price_id: document.getElementById('ob-price').value.trim() || undefined,
+    success_url: location.origin + location.pathname,
+    cancel_url: location.origin + location.pathname,
+  };
+  const errEl = document.getElementById('ob-error');
+  errEl.textContent = '';
+  if(!body.tenant_nombre || !body.owner_nombre || !body.owner_email){ errEl.textContent = 'Completa empresa, nombre y correo del dueño'; return; }
+  try{
+    const data = await trazi_callFunction('onboarding', body);
+    document.getElementById('ob-resultado').innerHTML = `
+      <div class="ok-box">
+        <strong>✓ Cliente creado</strong><br>
+        Link para que ${body.owner_nombre} defina su contraseña:<br>
+        <a href="${data.set_password_link}" target="_blank">${data.set_password_link}</a>
+        ${data.checkout_url ? `<br><br>Link de pago (Stripe Checkout):<br><a href="${data.checkout_url}" target="_blank">${data.checkout_url}</a>` : ''}
+      </div>`;
+    ['ob-nombre','ob-rut','ob-owner-nombre','ob-owner-email','ob-price'].forEach(id=>document.getElementById(id).value='');
+    cargarTenants();
+  }catch(e){ errEl.textContent = e.message; }
+}
+
+boot();
+</script>
+</body>
+</html>
