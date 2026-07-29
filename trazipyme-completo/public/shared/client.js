@@ -1,5 +1,16 @@
 // Cliente Supabase + helpers de sesión compartidos por /app, /dashboard y /admin
-const sb = window.supabase.createClient(window.TRAZI_CONFIG.SUPABASE_URL, window.TRAZI_CONFIG.SUPABASE_ANON_KEY);
+// Cada app tiene su PROPIA sesión (storageKey distinto): iniciar sesión en el
+// dashboard como dueño/gerente nunca afecta la sesión de /admin ni de /app, y
+// viceversa. Así el acceso de Odyssai queda realmente separado del de los
+// clientes, aunque vivan en el mismo dominio.
+function trazi_storageKey() {
+  if (location.pathname.startsWith('/admin')) return 'trazi-session-odyssai-admin';
+  if (location.pathname.startsWith('/dashboard')) return 'trazi-session-dashboard';
+  return 'trazi-session-app';
+}
+const sb = window.supabase.createClient(window.TRAZI_CONFIG.SUPABASE_URL, window.TRAZI_CONFIG.SUPABASE_ANON_KEY, {
+  auth: { storageKey: trazi_storageKey(), persistSession: true, autoRefreshToken: true },
+});
 
 async function trazi_login(email, password) {
   const { data, error } = await sb.auth.signInWithPassword({ email, password });
