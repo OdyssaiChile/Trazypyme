@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TraziPyme — Define tu contraseña</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="../shared/config.js"></script>
+<style>
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#F4F6F5;color:#1B1B1B;}
+  .wrap{max-width:380px;margin:80px auto;padding:0 20px;text-align:center;}
+  .card{background:#fff;border-radius:16px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,.06);text-align:left;}
+  input{width:100%;padding:12px;border-radius:10px;border:1px solid #DADDE0;font-size:15px;margin-bottom:10px;box-sizing:border-box;}
+  label{font-size:12px;color:#6B7280;font-weight:600;display:block;margin-bottom:4px;}
+  .btn{width:100%;padding:14px;border:none;border-radius:12px;font-size:15px;font-weight:700;background:#2E7D32;color:#fff;cursor:pointer;}
+  .muted{color:#6B7280;font-size:13px;}
+  .error{color:#C0392B;font-size:13px;margin:6px 0;}
+  .ok{color:#2E7D32;font-size:14px;margin:6px 0;font-weight:600;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div style="font-size:36px;">📦</div>
+  <h2 style="color:#2E7D32;">Define tu contraseña</h2>
+  <div class="card">
+    <p class="muted" id="intro">Este enlace te identifica automáticamente. Elige tu contraseña para continuar.</p>
+    <div id="form">
+      <label>Nueva contraseña (mínimo 8 caracteres)</label>
+      <input id="password" type="password" placeholder="••••••••">
+      <div class="error" id="error"></div>
+      <button class="btn" onclick="guardar()">Guardar contraseña</button>
+    </div>
+    <div id="resultado" style="display:none;"></div>
+  </div>
+</div>
+<script>
+const sb = window.supabase.createClient(window.TRAZI_CONFIG.SUPABASE_URL, window.TRAZI_CONFIG.SUPABASE_ANON_KEY);
+
+async function guardar(){
+  const p1 = document.getElementById('password').value;
+  const errEl = document.getElementById('error');
+  errEl.textContent = '';
+  if(p1.length < 8){ errEl.textContent = 'La contraseña debe tener al menos 8 caracteres.'; return; }
+  const { error } = await sb.auth.updateUser({ password: p1 });
+  if(error){ errEl.textContent = error.message; return; }
+  document.getElementById('form').style.display='none';
+  const r = document.getElementById('resultado');
+  r.style.display='block';
+  r.innerHTML = `<div class="ok">✓ Contraseña guardada</div><p class="muted">Ya puedes iniciar sesión en el <a href="../dashboard/">dashboard</a> o la <a href="../app/">app móvil</a>.</p>`;
+}
+
+// Supabase entrega el recovery token en el hash de la URL (#access_token=...&type=recovery)
+// supabase-js lo procesa automáticamente al cargar y crea la sesión.
+sb.auth.onAuthStateChange((event) => {
+  if(event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN'){
+    document.getElementById('intro').textContent = 'Sesión verificada. Elige tu nueva contraseña.';
+  }
+});
+</script>
+</body>
+</html>

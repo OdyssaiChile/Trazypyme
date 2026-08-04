@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TraziPyme — Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.1/qrcode.js"></script>
+<script src="../shared/config.js"></script>
+<script src="../shared/client.js"></script>
+<style>
+  :root{
+    --green:#2E7D32; --bg:#F4F6F5; --card:#fff; --text:#1B1B1B; --muted:#6B7280;
+    --red:#C0392B; --amber:#B7791F; --border:#E5E7EB;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
+  header{background:var(--green);color:#fff;padding:16px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+  header h1{font-size:19px;margin:0;}
+  header .sub{font-size:12px;opacity:.85;}
+  select{padding:8px 12px;border-radius:8px;border:none;font-size:14px;}
+  main{max-width:1180px;margin:0 auto;padding:24px 20px 60px;}
+  .hidden{display:none !important;}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:22px;}
+  .kpi{background:var(--card);border-radius:14px;padding:18px 20px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+  .kpi .label{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.03em;}
+  .kpi .value{font-size:26px;font-weight:700;margin-top:6px;}
+  .kpi .value.red{color:var(--red);}
+  .kpi .value.amber{color:var(--amber);}
+  .grid2{display:grid;grid-template-columns:1.3fr 1fr;gap:18px;margin-bottom:18px;}
+  .card{background:var(--card);border-radius:14px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+  .card h2{font-size:15px;margin:0 0 14px;display:flex;align-items:center;justify-content:space-between;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--border);font-size:11px;text-transform:uppercase;}
+  td{padding:8px 8px;border-bottom:1px solid #F0F1F2;}
+  .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;color:#fff;}
+  .badge-green{background:var(--green);}
+  .badge-amber{background:var(--amber);}
+  .badge-red{background:var(--red);}
+  .badge-grey{background:var(--muted);}
+  .alert-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #F0F1F2;font-size:13px;}
+  .alert-row:last-child{border-bottom:none;}
+  .alert-row .a-main{font-weight:600;}
+  .alert-row .a-sub{color:var(--muted);font-size:12px;}
+  .empty{color:var(--muted);font-size:13px;padding:10px 0;}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .btn{padding:9px 14px;border-radius:8px;border:1px solid var(--border);background:#fff;font-size:12px;font-weight:600;cursor:pointer;}
+  .btn:hover{background:#F7F8F8;}
+  .btn-primary{background:var(--green);color:#fff;border-color:var(--green);}
+  .btn-danger{color:var(--red);border-color:var(--red);}
+  .qr-controles{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .qr-controles select{padding:8px 12px;border-radius:8px;border:1px solid var(--border);font-size:13px;background:#fff;}
+  .qr-card.alerta{border-color:var(--red);}
+  .subseccion{margin-top:14px;padding-top:12px;border-top:1px solid var(--border);}
+  .subseccion-titulo{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin-bottom:6px;}
+  #card-suscripcion.destacado{outline:3px solid var(--green);transition:outline .2s;}
+  .bodega-fila{border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;}
+  .bodega-fila .bn{font-weight:700;font-size:14px;}
+  .accesos-lista{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;}
+  .acceso-item{display:flex;align-items:center;gap:6px;font-size:12px;background:var(--bg);padding:5px 10px;border-radius:20px;}
+  .acceso-item input{width:auto;margin:0;}
+  .graf-tab.active{background:var(--green);color:#fff;border-color:var(--green);}
+  .live-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#3FE07A;margin-right:6px;animation:pulse 1.6s infinite;}
+  @keyframes pulse{0%{opacity:1;}50%{opacity:.3;}100%{opacity:1;}}
+  .muted{color:var(--muted);font-size:12px;}
+  .qr-search{padding:8px 12px;border-radius:8px;border:1px solid var(--border);font-size:13px;width:220px;}
+  .qr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:14px;}
+  .qr-card{border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;}
+  .qr-card canvas{width:100%;height:auto;}
+  .qr-card .qn{font-weight:600;font-size:12px;margin-top:8px;}
+  .qr-card .qc{color:var(--muted);font-size:11px;margin-top:2px;}
+  .banner{padding:12px 20px;font-size:13px;font-weight:600;text-align:center;}
+  .banner-warn{background:#FFF3CD;color:#7A5B00;}
+  .banner-danger{background:#FBE1DE;color:var(--red);}
+  input,select.field-input{width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);font-size:13px;margin-bottom:8px;}
+  label.f{font-size:11px;color:var(--muted);font-weight:600;display:block;margin-bottom:3px;}
+  .error-text{color:var(--red);font-size:13px;margin:4px 0;}
+  #screen-login{max-width:340px;margin:80px auto;text-align:center;}
+  @media (max-width:900px){.kpis{grid-template-columns:repeat(2,1fr);}.grid2{grid-template-columns:1fr;}}
+
+  tr.clickable, .qr-card.clickable{cursor:pointer;transition:background .12s;}
+  tr.clickable:hover{background:#F7F8F8;}
+  .qr-card.clickable:hover{border-color:var(--green);box-shadow:0 1px 4px rgba(0,0,0,.08);}
+
+  .alert-section{margin-bottom:16px;}
+  .alert-section:last-child{margin-bottom:0;}
+  .alert-section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin-bottom:6px;}
+  .alert-row.urgent{background:#FBE1DE;border-radius:8px;padding:9px 10px;margin-bottom:4px;border-bottom:none;}
+  .alert-row.urgent .a-main{color:var(--red);}
+  .alert-row.urgent .a-sub{color:#9A342A;}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;}
+  .modal-box{background:#fff;border-radius:16px;max-width:900px;width:100%;max-height:88vh;overflow-y:auto;}
+  .modal-header{display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;}
+  .modal-header h2{margin:0;font-size:17px;}
+  .modal-body{padding:20px 22px;}
+  .pd-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:16px;}
+  .pd-grid h3{font-size:13px;margin:0 0 10px;}
+  .pd-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+  .pd-kpi{background:var(--bg);border-radius:10px;padding:12px 14px;}
+  .pd-kpi .label{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;}
+  .pd-kpi .value{font-size:18px;font-weight:700;margin-top:3px;}
+  @media (max-width:700px){.pd-grid{grid-template-columns:1fr;}.pd-kpis{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="screen-login" class="hidden">
+  <div style="font-size:40px;">📦</div>
+  <h1 style="color:var(--green);">TraziPyme</h1>
+  <div class="muted" style="margin-bottom:18px;">Dashboard de gestión</div>
+  <div class="card" style="text-align:left;">
+    <label class="f">Correo</label><input id="login-email" type="email" placeholder="tu@empresa.cl">
+    <label class="f">Contraseña</label><input id="login-password" type="password" placeholder="••••••••">
+    <div class="error-text" id="login-error"></div>
+    <button class="btn btn-primary" style="width:100%;padding:12px;" onclick="doLogin()">Ingresar</button>
+  </div>
+</div>
+
+<!-- SIN PERMISOS -->
+<div id="screen-sin-permiso" class="hidden" style="max-width:420px;margin:100px auto;text-align:center;">
+  <div style="font-size:44px;">🚫</div>
+  <h2 id="sin-permiso-titulo">Este dashboard es solo para dueños y gerentes</h2>
+  <p class="muted" id="sin-permiso-texto">Tu cuenta tiene rol de operario. Usa la app móvil de bodega para escanear y registrar movimientos.</p>
+  <button class="btn" onclick="logout()">Cerrar sesión</button>
+</div>
+
+<div id="screen-suspendida" class="hidden" style="max-width:420px;margin:100px auto;text-align:center;">
+  <div style="font-size:44px;">🔒</div>
+  <h2>Cuenta suspendida</h2>
+  <p class="muted">Tu cuenta en TraziPyme está suspendida. Contacta a Odyssai para reactivarla.</p>
+  <button class="btn" onclick="logout()">Cerrar sesión</button>
+</div>
+
+<!-- APP -->
+<div id="screen-app" class="hidden">
+<div id="banner-suscripcion"></div>
+<header>
+  <div>
+    <h1>📦 TraziPyme — <span id="tenant-nombre">Dashboard</span></h1>
+    <div class="sub"><span class="live-dot"></span>Actualización en tiempo real</div>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;">
+    <select id="select-bodega" onchange="onBodegaChange()"></select>
+    <button class="btn" onclick="logout()">Cerrar sesión</button>
+  </div>
+</header>
+
+<main>
+  <div class="kpis">
+    <div class="kpi"><div class="label">SKUs activos</div><div class="value" id="kpi-skus">—</div></div>
+    <div class="kpi"><div class="label">Unidades en stock</div><div class="value" id="kpi-unidades">—</div></div>
+    <div class="kpi"><div class="label">Valor de inventario</div><div class="value" id="kpi-valor">—</div></div>
+    <div class="kpi"><div class="label">Alertas activas</div><div class="value amber" id="kpi-alertas">—</div></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>Historial de movimientos <span class="muted" id="hist-count"></span></h2>
+      <table>
+        <thead><tr><th>Fecha</th><th>Producto</th><th>Tipo</th><th>Cant.</th><th>Operario</th></tr></thead>
+        <tbody id="tabla-movimientos"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2>🔔 Alertas</h2>
+      <div class="alert-section">
+        <div class="alert-section-title">⏰ Vencimiento</div>
+        <div id="lista-alertas-vencimiento"></div>
+      </div>
+      <div class="alert-section">
+        <div class="alert-section-title">📉 Stock mínimo</div>
+        <div id="lista-alertas-stock"></div>
+      </div>
+      <div class="alert-section">
+        <div class="alert-section-title muted-title">💤 Sin movimiento reciente</div>
+        <div id="lista-alertas-sinmov"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>⚠️ Ventas en riesgo (stock bajo el mínimo) <span class="muted" style="font-weight:400;font-size:11px;">clic en una fila para ver detalle</span></h2>
+      <table>
+        <thead><tr><th>Producto</th><th>Stock</th><th>Mínimo</th><th>Valor expuesto</th></tr></thead>
+        <tbody id="tabla-riesgo"></tbody>
+      </table>
+      <div class="muted" style="margin-top:10px;">Valor total en riesgo: <strong id="valor-riesgo">$0</strong></div>
+    </div>
+    <div class="card">
+      <h2>📑 Reportes exportables</h2>
+      <p class="muted">Descarga reportes en CSV (compatible con Excel) para trazabilidad, mermas y valorización.</p>
+      <div class="btn-row">
+        <button class="btn" onclick="descargar('movimientos')">Trazabilidad por lote</button>
+        <button class="btn" onclick="descargar('mermas')">Mermas y bajas</button>
+        <button class="btn" onclick="descargar('valorizacion')">Valorización de inventario</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>👥 Equipo</h2>
+      <div id="lista-equipo" class="muted">Cargando...</div>
+      <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;">
+        <label class="f">Crear cuenta para un miembro del equipo</label>
+        <input id="nu-nombre" placeholder="Nombre completo">
+        <input id="nu-email" type="email" placeholder="correo@empresa.cl" autocomplete="off">
+        <input id="nu-password" type="text" placeholder="Contraseña (mínimo 8 caracteres)" autocomplete="new-password">
+        <select id="nu-rol" class="field-input">
+          <option value="operator">Operario de bodega</option>
+          <option value="manager">Gerente</option>
+        </select>
+        <div class="error-text" id="nu-error"></div>
+        <button class="btn btn-primary" style="width:100%;" onclick="crearUsuarioEquipo()">Crear cuenta</button>
+        <div id="nu-resultado" class="muted" style="margin-top:8px;"></div>
+      </div>
+    </div>
+    <div class="card" id="card-suscripcion">
+      <h2>💳 Suscripción y pagos</h2>
+      <div id="info-suscripcion" class="muted">Cargando...</div>
+
+      <div class="subseccion">
+        <div class="subseccion-titulo">🏬 Bodegas de tu plan</div>
+        <div id="info-bodegas-plan" class="muted"></div>
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn" onclick="ajustarBodegas(1)">➕ Contratar otra bodega</button>
+          <button class="btn" onclick="ajustarBodegas(-1)">➖ Quitar una bodega</button>
+        </div>
+        <div class="error-text" id="bodegas-plan-error"></div>
+      </div>
+
+      <div class="subseccion">
+        <div class="subseccion-titulo">💳 Método de pago</div>
+        <div id="info-metodo-pago" class="muted"></div>
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn btn-primary" id="btn-suscribir" onclick="irACheckout()">Activar / renovar plan</button>
+          <button class="btn" id="btn-cancelar-sub" onclick="cancelarSuscripcion()">Cancelar suscripción</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:18px;">
+    <h2>🏬 Bodegas y accesos <span class="muted" id="bodegas-cupo-label" style="font-weight:400;font-size:12px;"></span></h2>
+    <p class="muted" style="margin-top:-6px;font-size:12px;">Los dueños y gerentes ven todas las bodegas siempre. A los operarios les das acceso bodega por bodega marcando las casillas.</p>
+    <div id="gestion-bodegas"></div>
+    <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px;">
+      <label class="f">Crear una bodega nueva</label>
+      <div class="row">
+        <div><input id="nb-nombre" placeholder="Nombre (ej: Sucursal Norte)"></div>
+        <div><input id="nb-direccion" placeholder="Dirección (opcional)"></div>
+      </div>
+      <div class="error-text" id="nb-error"></div>
+      <button class="btn btn-primary" onclick="crearBodega()">Crear bodega</button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:18px;">
+    <h2>🧾 Historial de pagos</h2>
+    <table>
+      <thead><tr><th>Fecha</th><th>Monto</th><th>Estado</th><th>Método</th></tr></thead>
+      <tbody id="tabla-pagos"><tr><td colspan="4" class="empty">Cargando...</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="card" style="margin-bottom:18px;">
+    <h2>🔳 Códigos QR <span class="muted" id="qr-count"></span></h2>
+    <p class="muted" style="margin-top:-6px;">Lista en vivo de los QR actuales — útil para escanear y mostrar en la presentación. Clic en cualquiera para ver su detalle, historial y editarlo.</p>
+    <div class="qr-controles">
+      <input class="qr-search" id="qr-buscar" placeholder="Buscar por nombre o código..." oninput="renderQRs()">
+      <select id="qr-filtro" onchange="renderQRs()">
+        <option value="todos">Todos los estados</option>
+        <option value="alerta">Solo con alertas</option>
+        <option value="stock_bajo">Stock bajo el mínimo</option>
+        <option value="por_vencer">Próximos a vencer</option>
+        <option value="ok">Sin alertas</option>
+      </select>
+      <select id="qr-orden" onchange="renderQRs()">
+        <option value="nombre">Ordenar: nombre (A-Z)</option>
+        <option value="stock_asc">Stock: menor a mayor</option>
+        <option value="stock_desc">Stock: mayor a menor</option>
+        <option value="vencimiento">Vencimiento más próximo</option>
+        <option value="valor_desc">Mayor valor de inventario</option>
+        <option value="reciente">Más recientes primero</option>
+      </select>
+    </div>
+    <div class="qr-grid" id="qr-grid"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:18px;">
+    <h2>📊 Análisis del negocio <span class="muted" id="grafico-info"></span></h2>
+    <div class="btn-row" style="margin-bottom:12px;">
+      <button class="btn graf-tab active" data-tipo="mermas_tiempo" onclick="cambiarGrafico('mermas_tiempo')">Merma en el tiempo</button>
+      <button class="btn graf-tab" data-tipo="flujo_tiempo" onclick="cambiarGrafico('flujo_tiempo')">Entradas vs salidas</button>
+      <button class="btn graf-tab" data-tipo="por_producto" onclick="cambiarGrafico('por_producto')">Movimiento por producto</button>
+      <button class="btn graf-tab" data-tipo="rotacion" onclick="cambiarGrafico('rotacion')">Rotación (más y menos vendidos)</button>
+      <button class="btn graf-tab" data-tipo="valorizacion" onclick="cambiarGrafico('valorizacion')">Valor del inventario</button>
+    </div>
+    <div class="qr-controles" style="margin-bottom:14px;">
+      <select id="graf-periodo" onchange="cargarGrafico()">
+        <option value="7">Últimos 7 días</option>
+        <option value="30" selected>Últimos 30 días</option>
+        <option value="90">Últimos 90 días</option>
+        <option value="180">Últimos 6 meses</option>
+        <option value="365">Último año</option>
+      </select>
+      <select id="graf-agrupacion" onchange="cargarGrafico()">
+        <option value="dia">Agrupar por día</option>
+        <option value="semana">Agrupar por semana</option>
+        <option value="mes" selected>Agrupar por mes</option>
+      </select>
+      <select id="graf-producto" onchange="cargarGrafico()">
+        <option value="">Todos los productos</option>
+      </select>
+    </div>
+    <div style="position:relative;height:340px;">
+      <canvas id="chart-reporte"></canvas>
+    </div>
+    <div class="empty" id="grafico-empty" style="display:none;text-align:center;">Sin datos en este período.</div>
+    <div id="grafico-resumen" class="muted" style="margin-top:12px;font-size:13px;"></div>
+  </div>
+</main>
+</div>
+
+<div id="modal-overlay" class="modal-overlay hidden" onclick="if(event.target===this) cerrarDetalle()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 id="pd-nombre">Producto</h2>
+      <button class="btn" onclick="cerrarDetalle()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="pd-kpis">
+        <div class="pd-kpi"><div class="label">Stock actual</div><div class="value" id="pd-stock">—</div></div>
+        <div class="pd-kpi"><div class="label">Valor inventario</div><div class="value" id="pd-valor">—</div></div>
+        <div class="pd-kpi"><div class="label">Bodega</div><div class="value" id="pd-bodega" style="font-size:14px;">—</div></div>
+      </div>
+      <div id="pd-badges" style="margin:10px 0;"></div>
+
+      <div class="pd-grid">
+        <div>
+          <h3>Editar producto</h3>
+          <label class="f">Nombre</label><input id="pd-in-nombre">
+          <div class="row">
+            <div><label class="f">Precio de costo (CLP)</label><input id="pd-in-precio" type="number" min="0"></div>
+            <div><label class="f">Stock mínimo</label><input id="pd-in-stockmin" type="number" min="0"></div>
+          </div>
+          <div class="row">
+            <div><label class="f">Lote</label><input id="pd-in-lote"></div>
+            <div><label class="f">Fecha de vencimiento</label><input id="pd-in-vencimiento" type="date"></div>
+          </div>
+          <label class="f">Corregir stock actual (crea un movimiento de ajuste auditado)</label>
+          <input id="pd-in-nuevostock" type="number" min="0">
+          <label class="f">Nota del ajuste (opcional)</label>
+          <input id="pd-in-nota" placeholder="Ej: conteo físico de bodega">
+          <div class="error-text" id="pd-error"></div>
+          <button class="btn btn-primary" style="width:100%;" onclick="guardarDetalle()">Guardar cambios</button>
+          <button class="btn btn-danger" id="btn-eliminar-producto" style="width:100%;margin-top:8px;" onclick="eliminarProductoDetalle()">🗑️ Eliminar este QR</button>
+        </div>
+        <div>
+          <h3>Historial completo <span class="muted" id="pd-hist-count"></span></h3>
+          <div style="max-height:360px;overflow-y:auto;">
+            <table>
+              <thead><tr><th>Fecha</th><th>Tipo</th><th>Cant.</th><th>Operario</th><th>Nota</th></tr></thead>
+              <tbody id="pd-historial"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let perfil = null;
+// Etiquetas y colores compartidos para TODO tipo de evento del historial:
+// movimientos de stock (ENTRADA/SALIDA/MUESTRA) y eventos de auditoría del
+// propio QR (CREACION/EDICION/ELIMINACION) — un solo lugar, sin repetir mapas.
+const TRAZI_TIPO_LABEL = { ENTRADA:'Entrada', SALIDA:'Salida', MUESTRA:'Muestra', CREACION:'QR creado', EDICION:'QR editado', ELIMINACION:'QR eliminado' };
+const TRAZI_TIPO_BADGE = { ENTRADA:'badge-green', SALIDA:'badge-red', MUESTRA:'badge-amber', CREACION:'badge-green', EDICION:'badge-amber', ELIMINACION:'badge-red' };
+let bodegas = [];
+let bodegaActual = '';
+let productoDetalleId = null;
+
+async function boot(){
+  const p = await trazi_getProfile();
+  if(!p){ show('login'); return; }
+  perfil = p;
+  if(p.role === 'super_admin'){
+    document.getElementById('sin-permiso-titulo').textContent = 'Esta es la cuenta de Odyssai';
+    document.getElementById('sin-permiso-texto').innerHTML = 'Las cuentas super_admin no pertenecen a ninguna empresa, así que no tiene sentido usarlas acá — este dashboard es solo para dueños/gerentes de un cliente. Usa <a href="../admin/">/admin</a> para gestionar clientes.';
+    show('sin-permiso'); return;
+  }
+  if(!['owner','manager'].includes(p.role)){
+    document.getElementById('sin-permiso-titulo').textContent = 'Este dashboard es solo para dueños y gerentes';
+    document.getElementById('sin-permiso-texto').textContent = 'Tu cuenta tiene rol de operario. Usa la app móvil de bodega para escanear y registrar movimientos.';
+    show('sin-permiso'); return;
+  }
+  if(p.tenant && p.tenant.activo === false){ show('suspendida'); return; }
+  show('app');
+  document.getElementById('tenant-nombre').textContent = p.tenant ? p.tenant.nombre : 'Panel Odyssai';
+  renderBanner();
+  await init();
+}
+
+function show(name){
+  ['login','sin-permiso','suspendida','app'].forEach(n => document.getElementById('screen-'+n)?.classList.add('hidden'));
+  const el = document.getElementById('screen-'+name);
+  if(el) el.classList.remove('hidden');
+}
+
+async function doLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  if(!email || !password){ errEl.textContent = 'Ingresa correo y contraseña'; return; }
+  try{
+    await trazi_login(email, password);
+    await boot();
+  }catch(e){
+    errEl.textContent = 'Correo o contraseña incorrectos';
+  }
+}
+async function logout(){ await trazi_logout(); perfil = null; show('login'); }
+
+function renderBanner(){
+  const t = perfil.tenant;
+  const el = document.getElementById('banner-suscripcion');
+  if(!t){ el.innerHTML=''; return; }
+  if(t.subscription_status === 'trialing'){
+    const dias = Math.max(0, Math.ceil((new Date(t.trial_ends_at) - new Date())/86400000));
+    el.innerHTML = `<div class="banner banner-warn">🕒 Estás en periodo de prueba: quedan ${dias} día(s). Activa tu plan para no perder acceso.</div>`;
+  } else if(!trazi_subscriptionOk(t)){
+    el.innerHTML = `<div class="banner banner-danger">🔒 Suscripción ${t.subscription_status}. El registro de nuevos movimientos está bloqueado hasta reactivarla.</div>`;
+  } else {
+    el.innerHTML = '';
+  }
+}
+
+async function init(){
+  await cargarBodegas();
+  reloadAll();
+  cargarEquipo();
+  cargarGestionBodegas();
+  cargarSuscripcion();
+  setInterval(refrescarDatos, 5000);
+}
+
+async function cargarBodegas(){
+  const { data } = await sb.from('bodegas').select('*').eq('activo', true).order('nombre');
+  bodegas = data || [];
+  const sel = document.getElementById('select-bodega');
+  const previo = bodegaActual;
+  sel.innerHTML = `<option value="">Todas las bodegas</option>`
+    + bodegas.map(b=>`<option value="${b.id}">${b.nombre}</option>`).join('')
+    + `<option value="__add__">➕ Añadir bodega...</option>`;
+  sel.value = bodegas.some(b=>b.id===previo) ? previo : '';
+  bodegaActual = sel.value;
+}
+
+// El selector hace doble función: elegir bodega, o disparar el flujo de
+// contratar una bodega adicional (que vive en Suscripción y pagos).
+function onBodegaChange(){
+  const sel = document.getElementById('select-bodega');
+  if(sel.value === '__add__'){
+    sel.value = bodegaActual || '';
+    irASuscripcion();
+    return;
+  }
+  reloadAll();
+}
+
+function irASuscripcion(){
+  const card = document.getElementById('card-suscripcion');
+  card.scrollIntoView({behavior:'smooth', block:'center'});
+  card.classList.add('destacado');
+  setTimeout(()=>card.classList.remove('destacado'), 2200);
+}
+
+// Refresco completo: cuando el usuario cambia de bodega o hace una acción.
+function reloadAll(){
+  bodegaActual = document.getElementById('select-bodega').value;
+  refrescarDatos();
+  poblarSelectorProductos().then(cargarGrafico);
+}
+
+// Refresco liviano: corre solo cada 5s. No toca los gráficos, para no
+// interrumpir al usuario mientras los está mirando o filtrando.
+function refrescarDatos(){
+  cargarResumen();
+  cargarMovimientos();
+  cargarAlertas();
+  cargarRiesgo();
+  cargarQRs();
+}
+
+async function productosDeBodega(){
+  let q = sb.from('productos_con_estado').select('*').eq('activo', true);
+  if(bodegaActual) q = q.eq('bodega_id', bodegaActual);
+  const { data } = await q;
+  return data || [];
+}
+
+async function cargarResumen(){
+  const productos = await productosDeBodega();
+  document.getElementById('kpi-skus').textContent = productos.length;
+  document.getElementById('kpi-unidades').textContent = productos.reduce((s,p)=>s+p.stock_actual,0).toLocaleString('es-CL');
+  document.getElementById('kpi-valor').textContent = trazi_fmtCLP(productos.reduce((s,p)=>s+Number(p.valor_inventario),0));
+  const alertas = productos.filter(p=>p.stock_bajo).length + productos.filter(p=>p.vencimiento_proximo).length;
+  document.getElementById('kpi-alertas').textContent = alertas;
+}
+
+async function cargarMovimientos(){
+  let q = sb.from('movimientos').select('*, productos!inner(nombre, bodega_id)').eq('deshecho', false).order('fecha', {ascending:false}).limit(15);
+  if(bodegaActual) q = q.eq('productos.bodega_id', bodegaActual);
+  const { data: arr } = await q;
+  const list = arr || [];
+  document.getElementById('hist-count').textContent = list.length + ' recientes';
+  document.getElementById('tabla-movimientos').innerHTML = list.length ? list.map(m=>`
+    <tr class="clickable" onclick="abrirDetalle('${m.producto_id}')">
+      <td class="muted">${new Date(m.fecha).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
+      <td>${m.productos.nombre}${m.nota ? `<div class="muted" style="font-size:11px;">${m.nota}</div>` : ''}</td>
+      <td><span class="badge ${TRAZI_TIPO_BADGE[m.tipo]}">${TRAZI_TIPO_LABEL[m.tipo]}</span></td>
+      <td>${m.cantidad>0 ? m.cantidad : '—'}</td>
+      <td class="muted">${m.operario_nombre}</td>
+    </tr>`).join('') : `<tr><td colspan="5" class="empty">Sin movimientos registrados</td></tr>`;
+}
+
+async function cargarAlertas(){
+  const productos = await productosDeBodega();
+  const { data: movs } = await sb.from('movimientos').select('producto_id, fecha').eq('deshecho', false).order('fecha', {ascending:false});
+  const ultimaPorProducto = {};
+  (movs||[]).forEach(m => { if(!ultimaPorProducto[m.producto_id]) ultimaPorProducto[m.producto_id] = m.fecha; });
+
+  const vencimiento = productos.filter(p=>p.vencimiento_proximo).sort((a,b)=>a.dias_para_vencer-b.dias_para_vencer);
+  const stockBajo = productos.filter(p=>p.stock_bajo).sort((a,b)=>a.stock_actual-b.stock_actual);
+  const ahora = Date.now();
+  const sinMovimiento = [];
+  for(const p of productos){
+    const ultima = ultimaPorProducto[p.id];
+    const diasSinMov = ultima ? Math.floor((ahora - new Date(ultima).getTime())/86400000) : null;
+    if(diasSinMov !== null && diasSinMov >= 7) sinMovimiento.push({...p, diasSinMov});
+  }
+
+  document.getElementById('lista-alertas-vencimiento').innerHTML = vencimiento.length ? vencimiento.map(p=>`
+    <div class="alert-row urgent clickable" onclick="abrirDetalle('${p.id}')">
+      <div><div class="a-main">⏰ ${p.nombre}</div><div class="a-sub">Vence en ${p.dias_para_vencer} día(s) · lote ${p.lote||'s/n'}</div></div>
+    </div>`).join('') : '<div class="empty">Sin productos próximos a vencer</div>';
+
+  document.getElementById('lista-alertas-stock').innerHTML = stockBajo.length ? stockBajo.map(p=>`
+    <div class="alert-row urgent clickable" onclick="abrirDetalle('${p.id}')">
+      <div><div class="a-main">📉 ${p.nombre}</div><div class="a-sub">Stock actual ${p.stock_actual}, mínimo ${p.stock_minimo}</div></div>
+    </div>`).join('') : '<div class="empty">Sin productos bajo el mínimo</div>';
+
+  document.getElementById('lista-alertas-sinmov').innerHTML = sinMovimiento.length ? sinMovimiento.map(p=>`
+    <div class="alert-row clickable" onclick="abrirDetalle('${p.id}')">
+      <div><div class="a-main">💤 ${p.nombre}</div><div class="a-sub">${p.diasSinMov} días sin registrar movimientos</div></div>
+    </div>`).join('') : '<div class="empty">Todo con movimiento reciente</div>';
+}
+
+async function cargarRiesgo(){
+  const productos = (await productosDeBodega()).filter(p=>p.stock_bajo);
+  document.getElementById('tabla-riesgo').innerHTML = productos.length ? productos.map(p=>`
+    <tr class="clickable" onclick="abrirDetalle('${p.id}')"><td>${p.nombre}</td><td style="color:var(--red);font-weight:700;">${p.stock_actual}</td><td class="muted">${p.stock_minimo}</td><td>${trazi_fmtCLP(p.valor_inventario)}</td></tr>`).join('')
+    : `<tr><td colspan="4" class="empty">Sin productos bajo el mínimo</td></tr>`;
+  document.getElementById('valor-riesgo').textContent = trazi_fmtCLP(productos.reduce((s,p)=>s+Number(p.valor_inventario),0));
+}
+
+function descargar(tipo){
+  csvParaTipo(tipo).then(({headers, rows, filename}) => {
+    const csv = [headers.join(',')].concat(rows.map(r => headers.map(h => `"${String(r[h] ?? '').replace(/"/g,'""')}"`).join(','))).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
+async function obtenerFilasReporte(tipo){
+  if(tipo === 'movimientos' || tipo === 'mermas'){
+    let q = sb.from('movimientos').select('fecha,tipo,cantidad,operario_nombre,responsable_muestra,destino_muestra,productos!inner(nombre,codigo_interno,lote,bodega_id)').eq('deshecho', false).order('fecha',{ascending:false});
+    if(tipo === 'mermas') q = q.eq('tipo', 'MUESTRA');
+    if(bodegaActual) q = q.eq('productos.bodega_id', bodegaActual);
+    const { data } = await q;
+    return (data||[]).map(m => ({
+      fecha: m.fecha, tipo: m.tipo, producto: m.productos.nombre, codigo_interno: m.productos.codigo_interno,
+      lote: m.productos.lote, cantidad: m.cantidad, operario: m.operario_nombre,
+      responsable_muestra: m.responsable_muestra, destino_muestra: m.destino_muestra,
+    }));
+  }
+  // valorizacion
+  const productos = await productosDeBodega();
+  return productos.map(p => ({ producto: p.nombre, codigo_interno: p.codigo_interno, lote: p.lote, stock_actual: p.stock_actual, precio_costo: p.precio_costo, valor_inventario: p.valor_inventario }));
+}
+
+async function csvParaTipo(tipo){
+  const rows = await obtenerFilasReporte(tipo);
+  if(tipo === 'movimientos') return { headers:['fecha','tipo','producto','codigo_interno','lote','cantidad','operario'], rows, filename:'trazabilidad_movimientos.csv' };
+  if(tipo === 'mermas') return { headers:['fecha','producto','codigo_interno','lote','cantidad','responsable_muestra','destino_muestra'], rows, filename:'mermas_y_bajas.csv' };
+  return { headers:['producto','codigo_interno','lote','stock_actual','precio_costo','valor_inventario'], rows, filename:'valorizacion_inventario.csv' };
+}
+
+let productosQR = [];
+async function cargarQRs(){ productosQR = await productosDeBodega(); renderQRs(); }
+
+// Filtro + orden compartido: lo usan la grilla de QR del dashboard y (con la
+// misma semántica) la app del operario, para que "stock bajo" signifique lo
+// mismo en las dos superficies.
+function traziFiltrarOrdenar(productos, {texto = '', filtro = 'todos', orden = 'nombre'} = {}){
+  const q = texto.toLowerCase().trim();
+  let lista = !q ? productos.slice() : productos.filter(p =>
+    p.nombre.toLowerCase().includes(q) || p.codigo_interno.toLowerCase().includes(q) || (p.lote||'').toLowerCase().includes(q));
+
+  if(filtro === 'alerta') lista = lista.filter(p => p.stock_bajo || p.vencimiento_proximo);
+  else if(filtro === 'stock_bajo') lista = lista.filter(p => p.stock_bajo);
+  else if(filtro === 'por_vencer') lista = lista.filter(p => p.vencimiento_proximo);
+  else if(filtro === 'ok') lista = lista.filter(p => !p.stock_bajo && !p.vencimiento_proximo);
+
+  const sinFecha = Number.MAX_SAFE_INTEGER;
+  const orders = {
+    nombre: (a,b) => a.nombre.localeCompare(b.nombre, 'es'),
+    stock_asc: (a,b) => a.stock_actual - b.stock_actual,
+    stock_desc: (a,b) => b.stock_actual - a.stock_actual,
+    vencimiento: (a,b) => (a.dias_para_vencer ?? sinFecha) - (b.dias_para_vencer ?? sinFecha),
+    valor_desc: (a,b) => Number(b.valor_inventario) - Number(a.valor_inventario),
+    reciente: (a,b) => new Date(b.creado_en) - new Date(a.creado_en),
+  };
+  return lista.sort(orders[orden] || orders.nombre);
+}
+
+function renderQRs(){
+  const lista = traziFiltrarOrdenar(productosQR, {
+    texto: document.getElementById('qr-buscar').value,
+    filtro: document.getElementById('qr-filtro').value,
+    orden: document.getElementById('qr-orden').value,
+  });
+  document.getElementById('qr-count').textContent = lista.length + (lista.length===1 ? ' código' : ' códigos');
+  const cont = document.getElementById('qr-grid');
+  if(!lista.length){ cont.innerHTML = '<div class="empty">Ningún producto coincide con el filtro</div>'; return; }
+  cont.innerHTML = lista.map(p => {
+    const alertas = [];
+    if(p.stock_bajo) alertas.push('<span class="badge badge-red">📉 Stock bajo</span>');
+    if(p.vencimiento_proximo) alertas.push(`<span class="badge badge-red">⏰ ${p.dias_para_vencer}d</span>`);
+    return `<div class="qr-card clickable ${(p.stock_bajo||p.vencimiento_proximo)?'alerta':''}" onclick="abrirDetalle('${p.id}')">
+      <canvas id="qrc-${p.id}"></canvas>
+      <div class="qn">${p.nombre}</div>
+      <div class="qc">${p.codigo_interno}${p.lote ? ' · '+p.lote : ''}</div>
+      <div class="qc">Stock: ${p.stock_actual} ${p.unidad_medida}</div>
+      ${alertas.length ? `<div style="margin-top:6px;">${alertas.join(' ')}</div>` : ''}
+    </div>`;
+  }).join('');
+  lista.forEach(p => { const c = document.getElementById('qrc-'+p.id); if(c) QRCode.toCanvas(c, p.codigo_interno, {width:140, color:{dark:'#1B1B1B', light:'#ffffff'}}); });
+}
+
+let chartInstance = null;
+let tipoGraficoActual = 'mermas_tiempo';
+function cambiarGrafico(tipo){
+  tipoGraficoActual = tipo;
+  document.querySelectorAll('.graf-tab').forEach(b=>b.classList.toggle('active', b.dataset.tipo===tipo));
+  // El selector de agrupación solo aplica a los gráficos con eje temporal
+  const esTemporal = ['mermas_tiempo','flujo_tiempo'].includes(tipo);
+  document.getElementById('graf-agrupacion').style.display = esTemporal ? '' : 'none';
+  cargarGrafico();
+}
+function paleta(n){ const colores=['#2E7D32','#1B5E20','#3FE07A','#B7791F','#C0392B','#6B7280','#0E7490','#7C3AED','#DB2777','#F59E0B']; const out=[]; for(let i=0;i<n;i++) out.push(colores[i%colores.length]); return out; }
+
+// Agrupa una fecha en el "cubo" temporal elegido (día / semana / mes)
+function cubeteTemporal(fecha, agrupacion){
+  const d = new Date(fecha);
+  if(agrupacion === 'dia') return d.toISOString().slice(0,10);
+  if(agrupacion === 'semana'){
+    const lunes = new Date(d);
+    lunes.setDate(d.getDate() - ((d.getDay()+6) % 7));
+    return lunes.toISOString().slice(0,10);
+  }
+  return d.toISOString().slice(0,7); // mes
+}
+function etiquetaCubete(key, agrupacion){
+  if(agrupacion === 'mes'){
+    const [a,m] = key.split('-');
+    return new Date(a, Number(m)-1, 1).toLocaleDateString('es-CL', {month:'short', year:'2-digit'});
+  }
+  const d = new Date(key + 'T00:00:00');
+  return agrupacion === 'semana'
+    ? 'Sem ' + d.toLocaleDateString('es-CL', {day:'2-digit', month:'short'})
+    : d.toLocaleDateString('es-CL', {day:'2-digit', month:'short'});
+}
+
+// Carga los movimientos del período elegido, respetando bodega y producto
+async function movimientosDelPeriodo(){
+  const dias = Number(document.getElementById('graf-periodo').value);
+  const desde = new Date(Date.now() - dias*86400000).toISOString();
+  const productoId = document.getElementById('graf-producto').value;
+
+  let q = sb.from('movimientos')
+    .select('tipo, cantidad, fecha, producto_id, productos!inner(nombre, bodega_id, precio_costo)')
+    .eq('deshecho', false)
+    .gte('fecha', desde)
+    .in('tipo', ['ENTRADA','SALIDA','MUESTRA'])
+    .order('fecha');
+  if(bodegaActual) q = q.eq('productos.bodega_id', bodegaActual);
+  if(productoId) q = q.eq('producto_id', productoId);
+  const { data } = await q;
+  return data || [];
+}
+
+// Mantiene el selector de productos sincronizado con la bodega elegida
+async function poblarSelectorProductos(){
+  const sel = document.getElementById('graf-producto');
+  const previo = sel.value;
+  const productos = await productosDeBodega();
+  sel.innerHTML = '<option value="">Todos los productos</option>' +
+    productos.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'))
+      .map(p=>`<option value="${p.id}">${p.nombre}${p.lote ? ' · '+p.lote : ''}</option>`).join('');
+  if(productos.some(p=>p.id===previo)) sel.value = previo;
+}
+
+async function cargarGrafico(){
+  const tipo = tipoGraficoActual;
+  const empty = document.getElementById('grafico-empty');
+  const canvas = document.getElementById('chart-reporte');
+  const infoEl = document.getElementById('grafico-info');
+  const resumenEl = document.getElementById('grafico-resumen');
+  const agrupacion = document.getElementById('graf-agrupacion').value;
+  let config = null;
+
+  if(tipo === 'valorizacion'){
+    const productos = await productosDeBodega();
+    if(!productos.length){ return vaciar(); }
+    const orden = productos.slice().sort((a,b)=>Number(b.valor_inventario)-Number(a.valor_inventario));
+    const total = orden.reduce((s,p)=>s+Number(p.valor_inventario),0);
+    config = { type:'doughnut',
+      data:{ labels: orden.map(p=>p.nombre), datasets:[{ data: orden.map(p=>Number(p.valor_inventario)), backgroundColor: paleta(orden.length) }]},
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ title:{display:true, text:'¿Dónde está tu plata? Valor de inventario por producto'},
+        tooltip:{ callbacks:{ label: c => `${c.label}: ${trazi_fmtCLP(c.raw)} (${((c.raw/total)*100).toFixed(1)}%)` } } } } };
+    infoEl.textContent = trazi_fmtCLP(total) + ' en total';
+    const top = orden[0];
+    resumenEl.innerHTML = top ? `💡 <strong>${top.nombre}</strong> concentra ${((Number(top.valor_inventario)/total)*100).toFixed(0)}% del valor de tu inventario (${trazi_fmtCLP(top.valor_inventario)}).` : '';
+    return pintar(config);
+  }
+
+  const movs = await movimientosDelPeriodo();
+  if(!movs.length){ return vaciar(); }
+
+  if(tipo === 'mermas_tiempo'){
+    const mermas = movs.filter(m => m.tipo === 'MUESTRA');
+    if(!mermas.length){ return vaciar('No hubo mermas en este período. 👍'); }
+    const cubos = {};
+    for(const m of mermas){
+      const k = cubeteTemporal(m.fecha, agrupacion);
+      cubos[k] = cubos[k] || { unidades:0, costo:0 };
+      cubos[k].unidades += m.cantidad;
+      cubos[k].costo += m.cantidad * Number(m.productos?.precio_costo || 0);
+    }
+    const keys = Object.keys(cubos).sort();
+    const totalU = mermas.reduce((s,m)=>s+m.cantidad,0);
+    const totalC = keys.reduce((s,k)=>s+cubos[k].costo,0);
+    config = { type:'bar',
+      data:{ labels: keys.map(k=>etiquetaCubete(k,agrupacion)), datasets:[
+        { type:'bar', label:'Unidades perdidas', data: keys.map(k=>cubos[k].unidades), backgroundColor:'#B7791F', yAxisID:'y' },
+        { type:'line', label:'Costo de la merma (CLP)', data: keys.map(k=>cubos[k].costo), borderColor:'#C0392B', backgroundColor:'#C0392B', yAxisID:'y1', tension:.3 },
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ title:{display:true, text:'Merma en el tiempo (salidas sin venta)'} },
+        scales:{ y:{ beginAtZero:true, position:'left', title:{display:true,text:'Unidades'} },
+                 y1:{ beginAtZero:true, position:'right', grid:{drawOnChartArea:false}, title:{display:true,text:'CLP'},
+                      ticks:{ callback: v => '$'+Number(v).toLocaleString('es-CL') } } } } };
+    infoEl.textContent = `${totalU} unidades · ${trazi_fmtCLP(totalC)}`;
+    resumenEl.innerHTML = `💸 En este período perdiste <strong>${totalU} unidades</strong> en mermas, equivalentes a <strong>${trazi_fmtCLP(totalC)}</strong> a precio de costo.`;
+    return pintar(config);
+  }
+
+  if(tipo === 'flujo_tiempo'){
+    const cubos = {};
+    for(const m of movs){
+      const k = cubeteTemporal(m.fecha, agrupacion);
+      cubos[k] = cubos[k] || { ENTRADA:0, SALIDA:0, MUESTRA:0 };
+      cubos[k][m.tipo] += m.cantidad;
+    }
+    const keys = Object.keys(cubos).sort();
+    const totalE = movs.filter(m=>m.tipo==='ENTRADA').reduce((s,m)=>s+m.cantidad,0);
+    const totalS = movs.filter(m=>m.tipo==='SALIDA').reduce((s,m)=>s+m.cantidad,0);
+    config = { type:'bar',
+      data:{ labels: keys.map(k=>etiquetaCubete(k,agrupacion)), datasets:[
+        { label:'Entradas', data: keys.map(k=>cubos[k].ENTRADA), backgroundColor:'#2E7D32' },
+        { label:'Salidas', data: keys.map(k=>-cubos[k].SALIDA), backgroundColor:'#C0392B' },
+        { label:'Mermas', data: keys.map(k=>-cubos[k].MUESTRA), backgroundColor:'#B7791F' },
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ title:{display:true, text:'Entradas vs salidas de mercadería'},
+          tooltip:{ callbacks:{ label: c => `${c.dataset.label}: ${Math.abs(c.raw)} unidades` } } },
+        scales:{ x:{stacked:true}, y:{stacked:true, title:{display:true,text:'Unidades (salidas hacia abajo)'},
+          ticks:{ callback: v => Math.abs(v) } } } } };
+    const neto = totalE - totalS;
+    infoEl.textContent = `+${totalE} / -${totalS}`;
+    resumenEl.innerHTML = `📦 Entraron <strong>${totalE}</strong> y salieron <strong>${totalS}</strong> unidades. ` +
+      (neto >= 0 ? `Tu stock creció en <strong>${neto}</strong> unidades.` : `Tu stock bajó en <strong>${Math.abs(neto)}</strong> unidades.`);
+    return pintar(config);
+  }
+
+  if(tipo === 'por_producto'){
+    const porProd = {};
+    for(const m of movs){
+      const n = m.productos?.nombre || '—';
+      porProd[n] = porProd[n] || { ENTRADA:0, SALIDA:0, MUESTRA:0 };
+      porProd[n][m.tipo] += m.cantidad;
+    }
+    const labels = Object.keys(porProd).sort((a,b)=>
+      (porProd[b].ENTRADA+porProd[b].SALIDA+porProd[b].MUESTRA) - (porProd[a].ENTRADA+porProd[a].SALIDA+porProd[a].MUESTRA));
+    config = { type:'bar',
+      data:{ labels, datasets:[
+        { label:'Entradas', data: labels.map(l=>porProd[l].ENTRADA), backgroundColor:'#2E7D32' },
+        { label:'Salidas', data: labels.map(l=>porProd[l].SALIDA), backgroundColor:'#C0392B' },
+        { label:'Mermas', data: labels.map(l=>porProd[l].MUESTRA), backgroundColor:'#B7791F' },
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false, indexAxis:'y',
+        plugins:{ title:{display:true, text:'Entradas y salidas por producto'} },
+        scales:{ x:{ beginAtZero:true, stacked:false, title:{display:true,text:'Unidades'} } } } };
+    infoEl.textContent = labels.length + ' productos con movimiento';
+    resumenEl.innerHTML = labels.length ? `🔎 <strong>${labels[0]}</strong> es el producto con más movimiento del período.` : '';
+    return pintar(config);
+  }
+
+  if(tipo === 'rotacion'){
+    // Rotación = cuánto sale. Los que más salen son tus caballos de batalla;
+    // los que no se movieron son plata detenida en la bodega.
+    const productos = await productosDeBodega();
+    const salidas = {};
+    for(const m of movs){ if(m.tipo === 'SALIDA') salidas[m.producto_id] = (salidas[m.producto_id]||0) + m.cantidad; }
+    const filas = productos.map(p => ({
+      nombre: p.nombre,
+      salidas: salidas[p.id] || 0,
+      inmovilizado: Number(p.valor_inventario),
+    })).sort((a,b) => b.salidas - a.salidas);
+    const sinMovimiento = filas.filter(f => f.salidas === 0);
+    const capitalQuieto = sinMovimiento.reduce((s,f)=>s+f.inmovilizado, 0);
+    config = { type:'bar',
+      data:{ labels: filas.map(f=>f.nombre), datasets:[
+        { label:'Unidades vendidas/despachadas', data: filas.map(f=>f.salidas),
+          backgroundColor: filas.map(f=>f.salidas === 0 ? '#C0392B' : '#2E7D32') } ]},
+      options:{ responsive:true, maintainAspectRatio:false, indexAxis:'y',
+        plugins:{ title:{display:true, text:'Rotación: qué se vende y qué está detenido'},
+          tooltip:{ callbacks:{ afterLabel: c => filas[c.dataIndex].salidas === 0
+            ? `⚠️ Sin salidas · ${trazi_fmtCLP(filas[c.dataIndex].inmovilizado)} detenidos` : '' } } },
+        scales:{ x:{ beginAtZero:true, title:{display:true,text:'Unidades que salieron'} } } } };
+    infoEl.textContent = `${filas.length - sinMovimiento.length} rotando · ${sinMovimiento.length} detenidos`;
+    resumenEl.innerHTML = sinMovimiento.length
+      ? `🚨 <strong>${sinMovimiento.length} producto(s)</strong> no tuvieron ninguna salida en este período, con <strong>${trazi_fmtCLP(capitalQuieto)}</strong> inmovilizados (en rojo en el gráfico).`
+      : '✅ Todos tus productos tuvieron movimiento en este período.';
+    return pintar(config);
+  }
+
+  function pintar(cfg){
+    empty.style.display='none'; canvas.style.display='block';
+    if(chartInstance) chartInstance.destroy();
+    chartInstance = new Chart(canvas.getContext('2d'), cfg);
+  }
+  function vaciar(msg){
+    empty.textContent = msg || 'Sin datos en este período.';
+    empty.style.display='block'; canvas.style.display='none';
+    infoEl.textContent=''; resumenEl.innerHTML='';
+    if(chartInstance){ chartInstance.destroy(); chartInstance=null; }
+  }
+}
+
+async function cargarEquipo(){
+  const { data } = await sb.from('profiles').select('*').order('created_at');
+  const roleLabel = {owner:'Dueño', manager:'Gerente', operator:'Operario', super_admin:'Odyssai'};
+  document.getElementById('lista-equipo').innerHTML = (data && data.length) ? data.map(u=>`
+    <div class="alert-row">
+      <div>
+        <div class="a-main">${u.nombre}${u.activo ? '' : ' <span class="badge badge-grey">Desactivado</span>'}</div>
+        <div class="a-sub">${u.email}</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+        <span class="badge badge-grey">${roleLabel[u.role]||u.role}</span>
+        ${u.role !== 'owner' ? `
+          <button class="btn" style="padding:4px 8px;font-size:11px;" onclick="resetPassword('${u.id}','${u.nombre.replace(/'/g,"\\'")}')">🔑</button>
+          <button class="btn" style="padding:4px 8px;font-size:11px;" onclick="alternarUsuario('${u.id}','${u.nombre.replace(/'/g,"\\'")}',${!u.activo})">${u.activo ? '🚫' : '✅'}</button>
+        ` : ''}
+      </div>
+    </div>`).join('')
+    : '<div class="empty">Sin usuarios aún</div>';
+}
+
+async function crearUsuarioEquipo(){
+  const nombre = document.getElementById('nu-nombre').value.trim();
+  const email = document.getElementById('nu-email').value.trim();
+  const password = document.getElementById('nu-password').value;
+  const role = document.getElementById('nu-rol').value;
+  const errEl = document.getElementById('nu-error');
+  const resEl = document.getElementById('nu-resultado');
+  errEl.textContent = ''; resEl.textContent = '';
+  if(!nombre || !email || !password){ errEl.textContent = 'Completa nombre, correo y contraseña'; return; }
+  if(password.length < 8){ errEl.textContent = 'La contraseña debe tener al menos 8 caracteres'; return; }
+  try{
+    await trazi_callFunction('crear-usuario', { accion:'crear', nombre, email, password, role });
+    resEl.innerHTML = `✓ Cuenta creada para <strong>${nombre}</strong>. Ya puede entrar con <strong>${email}</strong> y la contraseña que le asignaste.` +
+      (role === 'operator' ? '<br>Recuerda darle acceso a sus bodegas en "Bodegas y accesos".' : '');
+    ['nu-nombre','nu-email','nu-password'].forEach(id=>document.getElementById(id).value='');
+    cargarEquipo();
+    cargarGestionBodegas();
+  }catch(e){ errEl.textContent = e.message; }
+}
+
+async function resetPassword(userId, nombre){
+  const nueva = prompt(`Nueva contraseña para ${nombre} (mínimo 8 caracteres):`);
+  if(!nueva) return;
+  if(nueva.length < 8){ alert('La contraseña debe tener al menos 8 caracteres'); return; }
+  try{
+    await trazi_callFunction('crear-usuario', { accion:'reset_password', user_id: userId, password: nueva });
+    alert(`✓ Contraseña actualizada. Comunícasela a ${nombre}.`);
+  }catch(e){ alert(e.message); }
+}
+
+async function alternarUsuario(userId, nombre, activar){
+  const msg = activar
+    ? `¿Reactivar la cuenta de ${nombre}? Podrá volver a iniciar sesión.`
+    : `¿Desactivar la cuenta de ${nombre}? No podrá iniciar sesión hasta que la reactives. Su historial se conserva.`;
+  if(!confirm(msg)) return;
+  try{
+    await trazi_callFunction('crear-usuario', { accion:'set_activo', user_id: userId, activo: activar });
+    cargarEquipo();
+    cargarGestionBodegas();
+  }catch(e){ alert(e.message); }
+}
+
+async function cargarSuscripcion(){
+  const t = perfil.tenant;
+  const el = document.getElementById('info-suscripcion');
+  if(!t){ el.textContent = 'Sin tenant asociado.'; return; }
+  const statusLabel = {trialing:'En periodo de prueba', active:'Activa', past_due:'Pago pendiente', canceled:'Cancelada', incomplete:'Incompleta'};
+
+  const contratadas = t.bodegas_contratadas;
+  const extra = Math.max(0, contratadas - t.bodegas_incluidas);
+  const monto = Number(t.precio_base_clp) + extra * Number(t.precio_bodega_adicional_clp);
+
+  el.innerHTML = `Plan: <strong>${t.plan === 'pro' ? 'Pro' : 'Prueba gratuita'}</strong><br>` +
+    `Estado: <strong>${statusLabel[t.subscription_status]||t.subscription_status}</strong><br>` +
+    `Total mensual: <strong>${trazi_fmtCLP(monto)}</strong>` +
+    (t.current_period_end ? `<br>Próximo cobro: ${new Date(t.current_period_end).toLocaleDateString('es-CL')}` : '') +
+    (t.subscription_status==='trialing' ? `<br>Prueba termina: ${new Date(t.trial_ends_at).toLocaleDateString('es-CL')}` : '');
+
+  const usadas = (bodegas||[]).length;
+  document.getElementById('info-bodegas-plan').innerHTML =
+    `Tienes <strong>${usadas} de ${contratadas}</strong> bodegas en uso.<br>` +
+    `$${Number(t.precio_base_clp).toLocaleString('es-CL')} (incluye ${t.bodegas_incluidas})` +
+    (extra>0 ? ` + ${extra} adicional${extra>1?'es':''} × $${Number(t.precio_bodega_adicional_clp).toLocaleString('es-CL')} = <strong>${trazi_fmtCLP(monto)}/mes</strong>` : ` = <strong>${trazi_fmtCLP(monto)}/mes</strong>`) +
+    `<br><span style="font-size:12px;">Cada bodega extra suma $${Number(t.precio_bodega_adicional_clp).toLocaleString('es-CL')}/mes.</span>`;
+  document.getElementById('bodegas-cupo-label').textContent = `(${usadas} de ${contratadas} del plan)`;
+
+  document.getElementById('info-metodo-pago').innerHTML = t.mp_preapproval_id
+    ? `✓ Tarjeta registrada en MercadoPago${t.mp_payer_email ? ` (${t.mp_payer_email})` : ''}. El cobro se hace solo cada mes.<br><span style="font-size:12px;">Para cambiar la tarjeta, genera un nuevo link de pago con "Activar / renovar plan".</span>`
+    : 'Todavía no hay tarjeta registrada. Usa "Activar / renovar plan" para ingresarla una vez y dejar el cobro mensual automático.';
+
+  document.getElementById('btn-cancelar-sub').style.display = ['active','past_due'].includes(t.subscription_status) ? '' : 'none';
+  cargarHistorialPagos(t.id);
+}
+
+async function ajustarBodegas(delta){
+  const errEl = document.getElementById('bodegas-plan-error');
+  errEl.textContent = '';
+  const nueva = perfil.tenant.bodegas_contratadas + delta;
+  const t = perfil.tenant;
+  const extra = Math.max(0, nueva - t.bodegas_incluidas);
+  const nuevoMonto = Number(t.precio_base_clp) + extra * Number(t.precio_bodega_adicional_clp);
+  const msg = delta > 0
+    ? `¿Contratar una bodega adicional? Tu plan pasará a ${nueva} bodegas y ${trazi_fmtCLP(nuevoMonto)}/mes.`
+    : `¿Quitar una bodega del plan? Quedará en ${nueva} bodegas y ${trazi_fmtCLP(nuevoMonto)}/mes.`;
+  if(!confirm(msg)) return;
+
+  const { error } = await sb.rpc('ajustar_bodegas_contratadas', { p_nueva_cantidad: nueva });
+  if(error){ errEl.textContent = error.message; return; }
+  perfil = await trazi_getProfile();
+  cargarSuscripcion();
+  cargarGestionBodegas();
+  if(delta > 0) alert('Listo. Ya puedes crear la bodega nueva en la sección "Bodegas y accesos". El cobro se ajusta en tu próxima factura de MercadoPago.');
+}
+
+async function cargarGestionBodegas(){
+  const [{ data: todasBodegas }, { data: equipo }, { data: accesos }] = await Promise.all([
+    sb.from('bodegas').select('*').eq('activo', true).order('nombre'),
+    sb.from('profiles').select('id, nombre, role').eq('activo', true).order('nombre'),
+    sb.from('bodega_accesos').select('bodega_id, profile_id'),
+  ]);
+  const operarios = (equipo||[]).filter(u => u.role === 'operator');
+  const tieneAcceso = new Set((accesos||[]).map(a => a.bodega_id + '|' + a.profile_id));
+
+  document.getElementById('gestion-bodegas').innerHTML = (todasBodegas && todasBodegas.length)
+    ? todasBodegas.map(b => `
+      <div class="bodega-fila">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+          <div>
+            <div class="bn">${b.nombre}</div>
+            <div class="muted" style="font-size:12px;">${b.direccion || 'Sin dirección'}</div>
+          </div>
+          <button class="btn btn-danger" style="padding:6px 10px;font-size:12px;white-space:nowrap;" onclick="eliminarBodega('${b.id}','${b.nombre.replace(/'/g,"\\'")}')">🗑️ Eliminar</button>
+        </div>
+        <div class="accesos-lista">
+          ${operarios.length ? operarios.map(u => `
+            <label class="acceso-item">
+              <input type="checkbox" ${tieneAcceso.has(b.id+'|'+u.id) ? 'checked' : ''}
+                     onchange="cambiarAcceso('${u.id}','${b.id}',this.checked)">
+              ${u.nombre}
+            </label>`).join('')
+            : '<span class="muted" style="font-size:12px;">Aún no tienes operarios. Créalos en la sección Equipo.</span>'}
+        </div>
+      </div>`).join('')
+    : '<div class="empty">Todavía no tienes bodegas. Crea la primera abajo.</div>';
+}
+
+async function eliminarBodega(bodegaId, nombre){
+  const { count } = await sb.from('productos').select('id', {count:'exact', head:true})
+    .eq('bodega_id', bodegaId).eq('activo', true);
+  const aviso = count
+    ? `\n\n⚠️ Esta bodega tiene ${count} producto(s) activo(s). También se eliminarán (su historial se conserva).`
+    : '';
+  if(!confirm(`¿Eliminar la bodega "${nombre}"?${aviso}\n\nLibera un cupo de tu plan y podrás reducir la suscripción si quieres.`)) return;
+  const { error } = await sb.rpc('eliminar_bodega', { p_bodega_id: bodegaId });
+  if(error){ alert(error.message); return; }
+  await cargarBodegas();
+  cargarGestionBodegas();
+  cargarSuscripcion();
+  reloadAll();
+}
+
+async function cambiarAcceso(profileId, bodegaId, permitir){
+  const { error } = await sb.rpc('set_acceso_bodega', { p_profile_id: profileId, p_bodega_id: bodegaId, p_permitir: permitir });
+  if(error){ alert(error.message); cargarGestionBodegas(); }
+}
+
+async function crearBodega(){
+  const errEl = document.getElementById('nb-error');
+  errEl.textContent = '';
+  const nombre = document.getElementById('nb-nombre').value.trim();
+  if(!nombre){ errEl.textContent = 'Ponle un nombre a la bodega'; return; }
+  const { error } = await sb.rpc('crear_bodega', {
+    p_nombre: nombre,
+    p_direccion: document.getElementById('nb-direccion').value.trim() || null,
+  });
+  if(error){ errEl.textContent = error.message; return; }
+  document.getElementById('nb-nombre').value = '';
+  document.getElementById('nb-direccion').value = '';
+  await cargarBodegas();
+  cargarGestionBodegas();
+  cargarSuscripcion();
+  reloadAll();
+}
+
+async function cargarHistorialPagos(tenantId){
+  const { data: pagos } = await sb.from('pagos').select('*').eq('tenant_id', tenantId).order('fecha', {ascending:false}).limit(24);
+  const estadoLabel = { approved:'Aprobado', pending:'Pendiente', rejected:'Rechazado', refunded:'Reembolsado', cancelled:'Cancelado', in_process:'En proceso' };
+  const estadoBadge = { approved:'badge-green', pending:'badge-amber', rejected:'badge-red', refunded:'badge-grey', cancelled:'badge-grey', in_process:'badge-amber' };
+  document.getElementById('tabla-pagos').innerHTML = (pagos && pagos.length) ? pagos.map(p=>`
+    <tr>
+      <td class="muted">${new Date(p.fecha).toLocaleDateString('es-CL')}</td>
+      <td>${trazi_fmtCLP(p.monto)}</td>
+      <td><span class="badge ${estadoBadge[p.estado]||'badge-grey'}">${estadoLabel[p.estado]||p.estado}</span></td>
+      <td class="muted">${p.metodo_pago || '—'}</td>
+    </tr>`).join('') : `<tr><td colspan="4" class="empty">Sin pagos registrados todavía — aparecerán acá apenas MercadoPago procese el primer cobro.</td></tr>`;
+}
+
+async function irACheckout(){
+  const btn = document.getElementById('btn-suscribir');
+  btn.disabled = true; btn.textContent = 'Generando link...';
+  try{
+    const data = await trazi_callFunction('crear-suscripcion-mercadopago', {
+      back_url: location.href,
+    });
+    if(data.checkout_url) location.href = data.checkout_url;
+  }catch(e){ alert(e.message); }
+  finally{ btn.disabled = false; btn.textContent = 'Activar / renovar plan'; }
+}
+
+async function cancelarSuscripcion(){
+  if(!confirm('¿Cancelar tu suscripción? Perderás acceso al registrar movimientos cuando termine el período ya pagado.')) return;
+  const btn = document.getElementById('btn-cancelar-sub');
+  btn.disabled = true;
+  try{
+    await trazi_callFunction('cancelar-suscripcion-mercadopago', {});
+    perfil = await trazi_getProfile();
+    cargarSuscripcion();
+  }catch(e){ alert(e.message); }
+  finally{ btn.disabled = false; }
+}
+
+async function abrirDetalle(productoId){
+  productoDetalleId = productoId;
+  const { data: p, error } = await sb.from('productos_con_estado').select('*').eq('id', productoId).single();
+  if(error || !p){ alert('No se pudo cargar el producto'); return; }
+
+  document.getElementById('pd-nombre').textContent = p.nombre;
+  document.getElementById('pd-stock').textContent = `${p.stock_actual} ${p.unidad_medida}`;
+  document.getElementById('pd-valor').textContent = trazi_fmtCLP(p.valor_inventario);
+  document.getElementById('pd-bodega').textContent = p.bodega_nombre;
+
+  const badges = [];
+  if(!p.activo) badges.push('<span class="badge badge-grey">QR eliminado</span>');
+  if(p.stock_bajo) badges.push('<span class="badge badge-red">Stock bajo el mínimo</span>');
+  if(p.vencimiento_proximo) badges.push(`<span class="badge badge-red">Vence en ${p.dias_para_vencer} día(s)</span>`);
+  document.getElementById('pd-badges').innerHTML = badges.join(' ');
+
+  document.getElementById('pd-in-nombre').value = p.nombre;
+  document.getElementById('pd-in-precio').value = p.precio_costo;
+  document.getElementById('pd-in-stockmin').value = p.stock_minimo;
+  document.getElementById('pd-in-lote').value = p.lote || '';
+  document.getElementById('pd-in-vencimiento').value = p.fecha_vencimiento || '';
+  document.getElementById('pd-in-nuevostock').value = p.stock_actual;
+  document.getElementById('pd-in-nota').value = '';
+  document.getElementById('pd-error').textContent = '';
+
+  const puedeEditar = ['owner','manager'].includes(perfil.role) && p.activo;
+  document.querySelectorAll('#modal-overlay input').forEach(i => i.disabled = !puedeEditar);
+  document.querySelector('#modal-overlay .btn-primary').style.display = puedeEditar ? '' : 'none';
+  document.getElementById('btn-eliminar-producto').style.display = p.activo ? '' : 'none';
+
+  const { data: hist } = await sb.from('movimientos').select('*').eq('producto_id', productoId).order('fecha', {ascending:false}).limit(100);
+  document.getElementById('pd-hist-count').textContent = hist ? `(${hist.length})` : '';
+  document.getElementById('pd-historial').innerHTML = (hist && hist.length) ? hist.map(m=>`
+    <tr>
+      <td>${new Date(m.fecha).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
+      <td><span class="badge ${TRAZI_TIPO_BADGE[m.tipo]}">${TRAZI_TIPO_LABEL[m.tipo]}</span></td>
+      <td>${m.cantidad>0 ? m.cantidad : '—'}</td>
+      <td>${m.operario_nombre}</td>
+      <td class="muted">${m.nota || m.destino_muestra || ''}</td>
+    </tr>`).join('') : '<tr><td colspan="5" class="empty">Sin movimientos para este producto</td></tr>';
+
+  document.getElementById('modal-overlay').classList.remove('hidden');
+}
+
+async function eliminarProductoDetalle(){
+  if(!confirm('¿Eliminar este QR? Dejará de aparecer en listas activas, pero su historial se conserva.')) return;
+  const { error } = await sb.rpc('eliminar_producto', { p_producto_id: productoDetalleId });
+  if(error){ document.getElementById('pd-error').textContent = error.message; return; }
+  await abrirDetalle(productoDetalleId);
+  reloadAll();
+}
+
+function cerrarDetalle(){
+  document.getElementById('modal-overlay').classList.add('hidden');
+  productoDetalleId = null;
+}
+
+async function guardarDetalle(){
+  const errEl = document.getElementById('pd-error');
+  errEl.textContent = '';
+  const nuevoStock = document.getElementById('pd-in-nuevostock').value;
+  const { error } = await sb.rpc('actualizar_producto', {
+    p_producto_id: productoDetalleId,
+    p_nombre: document.getElementById('pd-in-nombre').value || null,
+    p_precio_costo: Number(document.getElementById('pd-in-precio').value || 0),
+    p_stock_minimo: Number(document.getElementById('pd-in-stockmin').value || 0),
+    p_fecha_vencimiento: document.getElementById('pd-in-vencimiento').value || null,
+    p_lote: document.getElementById('pd-in-lote').value || null,
+    p_nuevo_stock: nuevoStock === '' ? null : Number(nuevoStock),
+    p_nota: document.getElementById('pd-in-nota').value || null,
+  });
+  if(error){ errEl.textContent = error.message; return; }
+  await abrirDetalle(productoDetalleId);
+  reloadAll();
+}
+
+boot();
+</script>
+</body>
+</html>
