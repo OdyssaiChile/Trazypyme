@@ -1,9 +1,0 @@
-{
-  "name": "trazipyme-v2",
-  "version": "2.0.0",
-  "private": true,
-  "description": "TraziPyme — SaaS multi-tenant (Odyssai). Sitio 100% estático: la UI habla directo con Supabase (Auth + Postgres + RLS + Edge Functions). No requiere servidor Node en producción.",
-  "scripts": {
-    "dev": "npx serve public -l 3000"
-  }
-}
