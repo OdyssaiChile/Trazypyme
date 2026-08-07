@@ -1,0 +1,1594 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TraziPyme — Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="../shared/config.js"></script>
+<script src="../shared/client.js"></script>
+<style>
+  :root{ --green:#2E7D32; --green-dark:#1B5E20; --bg:#F4F6F5; --card:#fff; --text:#1B1B1B;
+         --muted:#6B7280; --red:#C0392B; --amber:#B7791F; --border:#E5E7EB; }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);}
+  .hidden{display:none !important;}
+  a{color:var(--green);}
+
+  /* ---------- Topbar ---------- */
+  header{background:var(--green-dark);color:#fff;padding:0;position:sticky;top:0;z-index:50;}
+  .topbar{display:flex;justify-content:space-between;align-items:center;padding:12px 24px;gap:16px;flex-wrap:wrap;}
+  .topbar h1{font-size:17px;margin:0;font-weight:700;}
+  .topbar .right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .topbar select{padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.25);
+                 background:rgba(255,255,255,.12);color:#fff;font-size:13px;max-width:230px;}
+  .topbar select option{color:#1B1B1B;}
+  .btn-logout{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.25);
+              padding:7px 13px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600;}
+
+  /* ---------- Navegación por secciones ---------- */
+  nav.secciones{display:flex;gap:2px;padding:0 16px;overflow-x:auto;background:var(--green-dark);}
+  nav.secciones button{background:transparent;border:none;color:rgba(255,255,255,.7);padding:11px 16px;
+    font-size:13px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;}
+  nav.secciones button:hover{color:#fff;}
+  nav.secciones button.active{color:#fff;border-bottom-color:#3FE07A;}
+
+  main{max-width:1180px;margin:0 auto;padding:22px 20px 70px;}
+  .seccion{display:none;}
+  .seccion.activa{display:block;}
+  .seccion-head{margin-bottom:16px;}
+  .seccion-head h2{font-size:20px;margin:0 0 4px;}
+  .seccion-head p{margin:0;color:var(--muted);font-size:13px;}
+
+  /* ---------- Componentes ---------- */
+  .card{background:var(--card);border-radius:14px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:18px;}
+  .card h3{font-size:15px;margin:0 0 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+  .card h3 .muted{font-weight:400;font-size:12px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;}
+  .kpi{background:var(--card);border-radius:14px;padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+  .kpi .label{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.03em;}
+  .kpi .value{font-size:23px;font-weight:700;margin-top:4px;}
+  .kpi .sub{font-size:11px;color:var(--muted);margin-top:2px;}
+  .kpi.clickable{cursor:pointer;transition:transform .1s;}
+  .kpi.clickable:hover{transform:translateY(-2px);box-shadow:0 3px 10px rgba(0,0,0,.1);}
+
+  input, select, textarea{width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);
+    font-size:13px;margin-bottom:10px;font-family:inherit;background:#fff;}
+  label.f{font-size:11px;color:var(--muted);font-weight:700;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.02em;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;}
+  .row > *{flex:1;min-width:150px;}
+
+  .btn{padding:10px 15px;border-radius:8px;border:1px solid var(--border);background:#fff;
+       font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .btn:hover{background:#F7F8F8;}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .btn-primary{background:var(--green);color:#fff;border-color:var(--green);}
+  .btn-primary:hover{background:var(--green-dark);}
+  .btn-danger{color:var(--red);border-color:var(--red);background:#fff;}
+  .btn-danger:hover{background:#FDF2F1;}
+  .btn-sm{padding:5px 9px;font-size:11px;}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;color:var(--muted);font-weight:700;padding:7px 8px;border-bottom:1px solid var(--border);
+     font-size:10px;text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0;background:#fff;z-index:1;}
+  td{padding:9px 8px;border-bottom:1px solid #F0F1F2;vertical-align:top;}
+  tr.clickable{cursor:pointer;}
+  tr.clickable:hover{background:#F7F8F8;}
+  .tabla-scroll{max-height:420px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;}
+  .tabla-scroll table{font-size:12.5px;}
+
+  .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:10.5px;font-weight:700;color:#fff;white-space:nowrap;}
+  .badge-green{background:var(--green);} .badge-amber{background:var(--amber);}
+  .badge-red{background:var(--red);} .badge-grey{background:var(--muted);}
+  .badge-blue{background:#0E7490;} .badge-purple{background:#7C3AED;}
+
+  .muted{color:var(--muted);}
+  .empty{color:var(--muted);text-align:center;padding:26px 12px;font-size:13px;}
+  .error-text{color:var(--red);font-size:12.5px;margin:6px 0;}
+  .ok-box{background:#EAF6EC;border:1px solid #BFE3C4;border-radius:10px;padding:14px;font-size:13px;margin-top:10px;word-break:break-word;}
+  .info-box{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:13px;font-size:12.5px;color:#1E40AF;margin-bottom:14px;}
+  .warn-box{background:#FEF9E7;border:1px solid #F5DEB3;border-radius:10px;padding:13px;font-size:12.5px;color:#7A5C00;margin-bottom:14px;}
+
+  .banner{padding:12px 16px;border-radius:10px;font-size:13px;margin-bottom:16px;font-weight:600;}
+  .banner-warn{background:#FEF9E7;color:var(--amber);}
+  .banner-danger{background:#FBE1DE;color:var(--red);}
+
+  .lista-item{display:flex;justify-content:space-between;align-items:center;gap:12px;
+              padding:11px 0;border-bottom:1px solid #F0F1F2;}
+  .lista-item:last-child{border-bottom:none;}
+  .lista-item .a-main{font-weight:600;font-size:13.5px;}
+  .lista-item .a-sub{font-size:11.5px;color:var(--muted);margin-top:2px;}
+  .lista-item.clickable{cursor:pointer;}
+  .lista-item.clickable:hover{background:#F7F8F8;}
+
+  .filtros{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+  .filtros input, .filtros select{margin-bottom:0;width:auto;min-width:145px;flex:0 1 auto;}
+  .filtros .crece{flex:1 1 190px;}
+
+  .qr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:14px;}
+  .qr-card{border:1px solid var(--border);border-radius:12px;padding:13px;text-align:center;cursor:pointer;background:#fff;}
+  .qr-card:hover{border-color:var(--green);box-shadow:0 2px 8px rgba(0,0,0,.07);}
+  .qr-card.alerta{border-color:var(--red);}
+  .qr-card canvas{width:100%;max-width:118px;height:auto;}
+  .qr-card .qn{font-weight:700;font-size:12.5px;margin-top:7px;line-height:1.25;}
+  .qr-card .qc{font-size:10.5px;color:var(--muted);margin-top:2px;}
+
+  .bodega-fila{border:1px solid var(--border);border-radius:11px;padding:14px;margin-bottom:11px;}
+  .bodega-fila .bn{font-weight:700;font-size:14.5px;}
+  .accesos-lista{display:flex;flex-wrap:wrap;gap:9px;margin-top:10px;}
+  .acceso-item{display:flex;align-items:center;gap:6px;font-size:12px;background:var(--bg);padding:5px 11px;border-radius:20px;}
+  .acceso-item input{width:auto;margin:0;}
+
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;
+                 justify-content:center;z-index:100;padding:20px;}
+  .modal-box{background:#fff;border-radius:16px;max-width:940px;width:100%;max-height:88vh;overflow-y:auto;}
+  .modal-box.chico{max-width:480px;}
+  .modal-header{display:flex;justify-content:space-between;align-items:center;padding:18px 22px;
+                border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:2;}
+  .modal-header h3{margin:0;font-size:17px;}
+  .modal-body{padding:20px 22px;}
+
+  #screen-login{max-width:350px;margin:90px auto;text-align:center;}
+  #screen-login .card{text-align:left;}
+  .pantalla-simple{max-width:430px;margin:90px auto;text-align:center;}
+
+  @media (max-width:900px){
+    .grid2,.grid3{grid-template-columns:1fr;}
+    .kpis{grid-template-columns:repeat(2,1fr);}
+    main{padding:16px 14px 60px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="screen-login" class="hidden">
+  <div style="font-size:44px;">📦</div>
+  <h1 style="font-size:22px;margin:6px 0 2px;">TraziPyme</h1>
+  <p class="muted" style="margin:0 0 18px;font-size:13px;">Panel de dueños y gerentes</p>
+  <div class="card">
+    <label class="f">Correo</label><input id="login-email" type="email" placeholder="tu@empresa.cl">
+    <label class="f">Contraseña</label><input id="login-password" type="password" placeholder="••••••••">
+    <div class="error-text" id="login-error"></div>
+    <button class="btn btn-primary" style="width:100%;padding:12px;" onclick="doLogin()">Ingresar</button>
+  </div>
+</div>
+
+<div id="screen-sin-permiso" class="pantalla-simple hidden">
+  <div style="font-size:44px;">🚫</div>
+  <h2 id="sin-permiso-titulo">Acceso restringido</h2>
+  <p class="muted" id="sin-permiso-texto"></p>
+  <button class="btn" onclick="logout()">Cerrar sesión</button>
+</div>
+
+<div id="screen-suspendida" class="pantalla-simple hidden">
+  <div style="font-size:44px;">🔒</div>
+  <h2>Cuenta suspendida</h2>
+  <p class="muted">Tu cuenta en TraziPyme está suspendida. Contacta a Odyssai para reactivarla.</p>
+  <button class="btn" onclick="logout()">Cerrar sesión</button>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="screen-app" class="hidden">
+<header>
+  <div class="topbar">
+    <h1>📦 <span id="tenant-nombre">TraziPyme</span></h1>
+    <div class="right">
+      <select id="select-bodega" onchange="onBodegaChange()"></select>
+      <button class="btn-logout" onclick="logout()">Salir</button>
+    </div>
+  </div>
+  <nav class="secciones">
+    <button data-sec="resumen" class="active" onclick="irASeccion('resumen')">📊 Resumen</button>
+    <button data-sec="inventario" onclick="irASeccion('inventario')">🔳 Inventario</button>
+    <button data-sec="movimientos" onclick="irASeccion('movimientos')">🕓 Movimientos</button>
+    <button data-sec="bodegas" onclick="irASeccion('bodegas')">🏬 Bodegas</button>
+    <button data-sec="equipo" onclick="irASeccion('equipo')">👥 Equipo</button>
+    <button data-sec="analisis" onclick="irASeccion('analisis')">📈 Análisis</button>
+    <button data-sec="suscripcion" onclick="irASeccion('suscripcion')">💳 Suscripción</button>
+  </nav>
+</header>
+
+<main>
+  <div id="banner-suscripcion"></div>
+
+  <!-- ======== RESUMEN ======== -->
+  <section class="seccion activa" id="sec-resumen">
+    <div class="seccion-head">
+      <h2>Resumen</h2>
+      <p id="resumen-alcance">Estado general de tu inventario</p>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><div class="label">Productos</div><div class="value" id="kpi-skus">—</div><div class="sub">códigos QR activos</div></div>
+      <div class="kpi"><div class="label">Unidades</div><div class="value" id="kpi-unidades">—</div><div class="sub">en stock</div></div>
+      <div class="kpi"><div class="label">Valor inventario</div><div class="value" id="kpi-valor">—</div><div class="sub">a precio de costo</div></div>
+      <div class="kpi clickable" onclick="irASeccion('inventario', {filtro:'alerta'})"><div class="label">Alertas</div><div class="value" id="kpi-alertas">—</div><div class="sub">requieren atención</div></div>
+    </div>
+
+    <div class="grid3">
+      <div class="card">
+        <h3>⏰ Por vencer <span class="muted" id="cnt-vencimiento"></span></h3>
+        <div id="lista-alertas-vencimiento"></div>
+      </div>
+      <div class="card">
+        <h3>📉 Stock bajo <span class="muted" id="cnt-stock"></span></h3>
+        <div id="lista-alertas-stock"></div>
+      </div>
+      <div class="card">
+        <h3>😴 Sin movimiento <span class="muted" id="cnt-sinmov"></span></h3>
+        <div id="lista-alertas-sinmov"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>🕓 Últimos movimientos <a href="#" onclick="irASeccion('movimientos');return false;" style="font-size:12px;font-weight:600;">Ver todos →</a></h3>
+      <div id="ultimos-movimientos"></div>
+    </div>
+  </section>
+
+  <!-- ======== INVENTARIO ======== -->
+  <section class="seccion" id="sec-inventario">
+    <div class="seccion-head">
+      <h2>Inventario</h2>
+      <p>Todos los códigos QR. Haz clic en cualquiera para ver su ficha, editarlo, traspasarlo o eliminarlo.</p>
+    </div>
+    <div class="card">
+      <h3>🔳 Códigos QR <span class="muted" id="qr-count"></span></h3>
+      <div class="filtros">
+        <input class="crece" id="qr-buscar" placeholder="Buscar por nombre, código o lote..." oninput="renderQRs()">
+        <select id="qr-filtro" onchange="renderQRs()">
+          <option value="todos">Todos los estados</option>
+          <option value="alerta">Solo con alertas</option>
+          <option value="stock_bajo">Stock bajo el mínimo</option>
+          <option value="por_vencer">Próximos a vencer</option>
+          <option value="sin_stock">Sin stock</option>
+          <option value="ok">Sin alertas</option>
+        </select>
+        <select id="qr-orden" onchange="renderQRs()">
+          <option value="nombre">Nombre (A-Z)</option>
+          <option value="stock_asc">Menos stock primero</option>
+          <option value="stock_desc">Más stock primero</option>
+          <option value="vencimiento">Vence antes</option>
+          <option value="valor_desc">Mayor valor</option>
+          <option value="reciente">Más recientes</option>
+        </select>
+      </div>
+      <div class="qr-grid" id="qr-grid"></div>
+    </div>
+  </section>
+
+  <!-- ======== MOVIMIENTOS ======== -->
+  <section class="seccion" id="sec-movimientos">
+    <div class="seccion-head">
+      <h2>Movimientos</h2>
+      <p>Historial completo y auditable. Filtra por tipo, fecha, persona o producto.</p>
+    </div>
+    <div class="card">
+      <h3>🕓 Historial <span class="muted" id="mov-count"></span></h3>
+      <div class="filtros">
+        <input class="crece" id="mov-buscar" placeholder="Buscar producto o nota..." oninput="renderMovimientos()">
+        <select id="mov-tipo" onchange="renderMovimientos()">
+          <option value="">Todos los tipos</option>
+          <option value="ENTRADA">Entradas</option>
+          <option value="SALIDA">Salidas</option>
+          <option value="MUESTRA">Mermas</option>
+          <option value="TRASPASO_SALIDA">Traspasos enviados</option>
+          <option value="TRASPASO_ENTRADA">Traspasos recibidos</option>
+          <option value="CREACION">QR creados</option>
+          <option value="EDICION">QR editados</option>
+          <option value="ELIMINACION">QR eliminados</option>
+        </select>
+        <select id="mov-persona" onchange="renderMovimientos()">
+          <option value="">Todas las personas</option>
+        </select>
+        <select id="mov-periodo" onchange="cargarMovimientos()">
+          <option value="7">Últimos 7 días</option>
+          <option value="30" selected>Últimos 30 días</option>
+          <option value="90">Últimos 90 días</option>
+          <option value="365">Último año</option>
+          <option value="0">Todo el historial</option>
+        </select>
+        <button class="btn btn-sm" onclick="limpiarFiltrosMov()">Limpiar filtros</button>
+      </div>
+      <div class="tabla-scroll">
+        <table>
+          <thead><tr><th>Fecha</th><th>Producto</th><th>Bodega</th><th>Tipo</th><th>Cant.</th><th>Persona</th><th>Nota</th></tr></thead>
+          <tbody id="tabla-movimientos"></tbody>
+        </table>
+      </div>
+      <div class="muted" style="font-size:11.5px;margin-top:8px;">Se muestran hasta 10 filas a la vez — desplázate dentro de la tabla para ver el resto.</div>
+    </div>
+  </section>
+
+  <!-- ======== BODEGAS ======== -->
+  <section class="seccion" id="sec-bodegas">
+    <div class="seccion-head">
+      <h2>Bodegas</h2>
+      <p>Vista general de todas tus bodegas, traspasos de stock y permisos de acceso.</p>
+    </div>
+
+    <div class="card">
+      <h3>🌐 Vista general — todas las bodegas</h3>
+      <div class="tabla-scroll" style="max-height:none;">
+        <table>
+          <thead><tr><th>Bodega</th><th>Productos</th><th>Unidades</th><th>Valor</th><th>Alertas</th><th>Últ. movimiento</th></tr></thead>
+          <tbody id="tabla-vista-general"></tbody>
+        </table>
+      </div>
+      <div id="totales-generales" class="muted" style="margin-top:12px;font-size:13px;"></div>
+    </div>
+
+    <div class="card">
+      <h3>🔄 Traspasar stock entre bodegas</h3>
+      <div class="info-box">Mueve unidades de una bodega a otra. Queda registrado en el historial de ambas, con el motivo y el destino.</div>
+      <div class="row">
+        <div>
+          <label class="f">Producto a mover</label>
+          <select id="tr-producto" onchange="onTraspasoProductoChange()"><option value="">Selecciona un producto...</option></select>
+        </div>
+        <div>
+          <label class="f">Bodega de destino</label>
+          <select id="tr-destino"><option value="">Selecciona destino...</option></select>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label class="f">Cantidad <span id="tr-disponible" class="muted" style="text-transform:none;"></span></label>
+          <input id="tr-cantidad" type="number" min="1" placeholder="0">
+        </div>
+        <div>
+          <label class="f">Motivo del traspaso</label>
+          <input id="tr-motivo" placeholder="Ej: reposición sucursal, pedido cliente">
+        </div>
+      </div>
+      <div class="error-text" id="tr-error"></div>
+      <div id="tr-resultado"></div>
+      <button class="btn btn-primary" onclick="ejecutarTraspaso()">Traspasar stock</button>
+    </div>
+
+    <div class="card">
+      <h3>🏬 Tus bodegas y quién accede a cada una <span class="muted" id="bodegas-cupo-label"></span></h3>
+      <div class="info-box">Dueños y gerentes ven todas las bodegas siempre. A los operarios les das acceso bodega por bodega marcando las casillas.</div>
+      <div id="gestion-bodegas"></div>
+      <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px;">
+        <label class="f">Crear una bodega nueva</label>
+        <div class="row">
+          <div><input id="nb-nombre" placeholder="Nombre (ej: Sucursal Norte)"></div>
+          <div><input id="nb-direccion" placeholder="Dirección (opcional)"></div>
+        </div>
+        <div class="error-text" id="nb-error"></div>
+        <button class="btn btn-primary" onclick="crearBodega()">Crear bodega</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======== EQUIPO ======== -->
+  <section class="seccion" id="sec-equipo">
+    <div class="seccion-head">
+      <h2>Equipo</h2>
+      <p>Las cuentas de acceso de tu organización.</p>
+    </div>
+
+    <div class="card">
+      <h3>👥 Miembros <span class="muted" id="equipo-count"></span></h3>
+      <div class="warn-box">
+        🔐 <strong>Sobre las contraseñas:</strong> por seguridad se guardan cifradas (hash irreversible) — ni TraziPyme ni Odyssai pueden verlas, es el estándar de la industria y lo que protege a tu empresa si alguien accediera a la base de datos.
+        Si alguien olvida la suya, usa <strong>🔑 Cambiar contraseña</strong>: tú defines una nueva al instante y se la comunicas.
+      </div>
+      <div class="tabla-scroll" style="max-height:none;">
+        <table>
+          <thead><tr><th>Nombre</th><th>Correo de acceso</th><th>Rol</th><th>Bodegas</th><th>Estado</th><th></th></tr></thead>
+          <tbody id="tabla-equipo"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>➕ Crear cuenta para un miembro del equipo</h3>
+      <div class="info-box">La cuenta queda lista de inmediato: le entregas el correo y la contraseña que definas acá, y ya puede entrar.</div>
+      <div class="row">
+        <div><label class="f">Nombre completo</label><input id="nu-nombre" placeholder="Ej: María González"></div>
+        <div><label class="f">Correo de acceso</label><input id="nu-email" type="email" placeholder="maria@empresa.cl" autocomplete="off"></div>
+      </div>
+      <div class="row">
+        <div>
+          <label class="f">Contraseña inicial</label>
+          <div style="display:flex;gap:8px;">
+            <input id="nu-password" type="text" placeholder="Mínimo 8 caracteres" autocomplete="new-password" style="flex:1;">
+            <button class="btn" style="white-space:nowrap;" onclick="generarPassword('nu-password')">🎲 Generar</button>
+          </div>
+        </div>
+        <div>
+          <label class="f">Rol</label>
+          <select id="nu-rol">
+            <option value="operator">Operario de bodega — escanea y registra movimientos</option>
+            <option value="manager">Gerente — acceso completo a este dashboard</option>
+          </select>
+        </div>
+      </div>
+      <div class="error-text" id="nu-error"></div>
+      <div id="nu-resultado"></div>
+      <button class="btn btn-primary" onclick="crearUsuarioEquipo()">Crear cuenta</button>
+    </div>
+  </section>
+
+  <!-- ======== ANÁLISIS ======== -->
+  <section class="seccion" id="sec-analisis">
+    <div class="seccion-head">
+      <h2>Análisis del negocio</h2>
+      <p>Qué se mueve, qué se pierde y dónde está tu capital.</p>
+    </div>
+    <div class="card">
+      <div class="btn-row" style="margin-bottom:14px;">
+        <button class="btn graf-tab active" data-tipo="mermas_tiempo" onclick="cambiarGrafico('mermas_tiempo')">Merma en el tiempo</button>
+        <button class="btn graf-tab" data-tipo="flujo_tiempo" onclick="cambiarGrafico('flujo_tiempo')">Entradas vs salidas</button>
+        <button class="btn graf-tab" data-tipo="por_producto" onclick="cambiarGrafico('por_producto')">Movimiento por producto</button>
+        <button class="btn graf-tab" data-tipo="rotacion" onclick="cambiarGrafico('rotacion')">Rotación</button>
+        <button class="btn graf-tab" data-tipo="valorizacion" onclick="cambiarGrafico('valorizacion')">Valor del inventario</button>
+      </div>
+      <div class="filtros">
+        <select id="graf-periodo" onchange="cargarGrafico()">
+          <option value="7">Últimos 7 días</option>
+          <option value="30" selected>Últimos 30 días</option>
+          <option value="90">Últimos 90 días</option>
+          <option value="180">Últimos 6 meses</option>
+          <option value="365">Último año</option>
+        </select>
+        <select id="graf-agrupacion" onchange="cargarGrafico()">
+          <option value="dia">Por día</option>
+          <option value="semana">Por semana</option>
+          <option value="mes" selected>Por mes</option>
+        </select>
+        <select id="graf-producto" onchange="cargarGrafico()"><option value="">Todos los productos</option></select>
+        <span class="muted" id="grafico-info" style="font-size:12px;"></span>
+      </div>
+      <div style="position:relative;height:350px;">
+        <canvas id="chart-reporte"></canvas>
+      </div>
+      <div class="empty" id="grafico-empty" style="display:none;"></div>
+      <div id="grafico-resumen" class="muted" style="margin-top:14px;font-size:13px;"></div>
+    </div>
+
+    <div class="card">
+      <h3>📥 Descargar reportes (CSV)</h3>
+      <p class="muted" style="margin-top:-6px;font-size:12.5px;">Para abrir en Excel o mandarle a tu contador.</p>
+      <div class="btn-row">
+        <button class="btn" onclick="descargar('movimientos')">Trazabilidad completa</button>
+        <button class="btn" onclick="descargar('mermas')">Mermas y bajas</button>
+        <button class="btn" onclick="descargar('valorizacion')">Valorización de inventario</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======== SUSCRIPCIÓN ======== -->
+  <section class="seccion" id="sec-suscripcion">
+    <div class="seccion-head">
+      <h2>Suscripción y pagos</h2>
+      <p>Tu plan, tus bodegas contratadas y tu historial de cobros.</p>
+    </div>
+
+    <div class="grid2">
+      <div class="card" id="card-plan">
+        <h3>💳 Tu plan</h3>
+        <div id="info-suscripcion" class="muted">Cargando...</div>
+
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+          <label class="f">Correo de quien va a pagar</label>
+          <input id="sub-payer-email" type="email" placeholder="correo@ejemplo.cl" autocomplete="off">
+          <div class="muted" style="font-size:11.5px;margin-top:-4px;">
+            MercadoPago pide que quien pague entre con la cuenta de este correo.
+            Déjalo con el del dueño, o cámbialo si paga un socio o el contador.
+          </div>
+        </div>
+
+        <div class="btn-row" style="margin-top:14px;">
+          <button class="btn btn-primary" id="btn-suscribir" onclick="irACheckout()">Activar / renovar plan</button>
+          <button class="btn btn-danger" id="btn-cancelar-sub" onclick="cancelarSuscripcion()">Cancelar suscripción</button>
+        </div>
+        <div id="checkout-resultado" style="margin-top:10px;"></div>
+      </div>
+
+      <div class="card">
+        <h3>🏬 Bodegas contratadas</h3>
+        <div id="info-bodegas-plan" class="muted"></div>
+        <div class="btn-row" style="margin-top:14px;">
+          <button class="btn" onclick="ajustarBodegas(1)">➕ Contratar otra bodega</button>
+          <button class="btn" onclick="ajustarBodegas(-1)">➖ Quitar una bodega</button>
+        </div>
+        <div class="error-text" id="bodegas-plan-error"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>🧾 Historial de pagos</h3>
+      <table>
+        <thead><tr><th>Fecha</th><th>Monto</th><th>Estado</th><th>Método</th></tr></thead>
+        <tbody id="tabla-pagos"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+</div>
+
+<!-- ============ MODAL DETALLE PRODUCTO ============ -->
+<div id="modal-producto" class="modal-overlay hidden" onclick="if(event.target===this) cerrarDetalle()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="pd-nombre">Producto</h3>
+      <button class="btn" onclick="cerrarDetalle()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="kpis" style="grid-template-columns:repeat(3,1fr);">
+        <div class="kpi"><div class="label">Stock actual</div><div class="value" id="pd-stock">—</div></div>
+        <div class="kpi"><div class="label">Valor</div><div class="value" id="pd-valor">—</div></div>
+        <div class="kpi"><div class="label">Bodega</div><div class="value" id="pd-bodega" style="font-size:15px;">—</div></div>
+      </div>
+      <div id="pd-badges" style="margin-bottom:16px;"></div>
+
+      <div class="grid2">
+        <div>
+          <h4 style="font-size:13px;margin:0 0 10px;">✏️ Editar datos</h4>
+          <label class="f">Nombre</label><input id="pd-in-nombre">
+          <label class="f">Precio de costo (CLP)</label><input id="pd-in-precio" type="number">
+          <label class="f">Stock mínimo</label><input id="pd-in-stockmin" type="number">
+          <label class="f">Lote</label><input id="pd-in-lote">
+          <label class="f">Fecha de vencimiento</label><input id="pd-in-vencimiento" type="date">
+          <label class="f">Corregir stock actual (queda auditado)</label><input id="pd-in-nuevostock" type="number">
+          <label class="f">Nota del ajuste</label><input id="pd-in-nota" placeholder="Ej: conteo físico de bodega">
+          <div class="error-text" id="pd-error"></div>
+          <button class="btn btn-primary" style="width:100%;" onclick="guardarDetalle()">Guardar cambios</button>
+          <button class="btn btn-danger" id="btn-eliminar-producto" style="width:100%;margin-top:8px;" onclick="eliminarProductoDetalle()">🗑️ Eliminar este QR</button>
+        </div>
+        <div>
+          <h4 style="font-size:13px;margin:0 0 10px;">🕓 Historial <span class="muted" id="pd-hist-count"></span></h4>
+          <div class="tabla-scroll">
+            <table>
+              <thead><tr><th>Fecha</th><th>Tipo</th><th>Cant.</th><th>Persona</th><th>Nota</th></tr></thead>
+              <tbody id="pd-historial"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Estado global
+// ============================================================
+let perfil = null;
+let bodegas = [];            // bodegas activas visibles para este usuario
+let bodegaActual = null;     // '' = todas las bodegas
+let productosQR = [];        // productos de la bodega/vista actual
+let movimientosCargados = []; // historial crudo del período elegido
+let productoDetalleId = null;
+let chartInstance = null;
+let tipoGraficoActual = 'mermas_tiempo';
+
+// Etiquetas y colores de TODOS los tipos de evento, en un solo lugar.
+const TRAZI_TIPO_LABEL = {
+  ENTRADA:'Entrada', SALIDA:'Salida', MUESTRA:'Merma',
+  TRASPASO_SALIDA:'Traspaso enviado', TRASPASO_ENTRADA:'Traspaso recibido',
+  CREACION:'QR creado', EDICION:'QR editado', ELIMINACION:'QR eliminado',
+};
+const TRAZI_TIPO_BADGE = {
+  ENTRADA:'badge-green', SALIDA:'badge-red', MUESTRA:'badge-amber',
+  TRASPASO_SALIDA:'badge-blue', TRASPASO_ENTRADA:'badge-blue',
+  CREACION:'badge-green', EDICION:'badge-amber', ELIMINACION:'badge-red',
+};
+const ROLE_LABEL = {owner:'Dueño', manager:'Gerente', operator:'Operario', super_admin:'Odyssai'};
+const ESTADO_SUB_LABEL = {trialing:'En periodo de prueba', active:'Activa', past_due:'Pago pendiente', canceled:'Cancelada', incomplete:'Pago incompleto'};
+
+// ============================================================
+// Arranque y sesión
+// ============================================================
+async function boot(){
+  const p = await trazi_getProfile();
+  if(!p){ mostrarPantalla('login'); return; }
+  perfil = p;
+  if(p.role === 'super_admin'){
+    document.getElementById('sin-permiso-titulo').textContent = 'Esta es la cuenta de Odyssai';
+    document.getElementById('sin-permiso-texto').innerHTML = 'Las cuentas de Odyssai no pertenecen a ninguna empresa. Usa <a href="../admin/">el panel de administración</a> para gestionar clientes.';
+    mostrarPantalla('sin-permiso'); return;
+  }
+  if(!['owner','manager'].includes(p.role)){
+    document.getElementById('sin-permiso-titulo').textContent = 'Este panel es para dueños y gerentes';
+    document.getElementById('sin-permiso-texto').textContent = 'Tu cuenta tiene rol de operario. Usa la app de bodega para escanear y registrar movimientos.';
+    mostrarPantalla('sin-permiso'); return;
+  }
+  if(p.tenant && p.tenant.activo === false){ mostrarPantalla('suspendida'); return; }
+
+  mostrarPantalla('app');
+  document.getElementById('tenant-nombre').textContent = p.tenant ? p.tenant.nombre : 'TraziPyme';
+  renderBannerSuscripcion();
+  await init();
+}
+
+function mostrarPantalla(nombre){
+  ['login','sin-permiso','suspendida','app'].forEach(n=>document.getElementById('screen-'+n)?.classList.add('hidden'));
+  document.getElementById('screen-'+nombre)?.classList.remove('hidden');
+}
+
+async function doLogin(){
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  try{
+    await trazi_login(document.getElementById('login-email').value.trim(), document.getElementById('login-password').value);
+    await boot();
+  }catch(e){ errEl.textContent = 'Correo o contraseña incorrectos'; }
+}
+async function logout(){ await trazi_logout(); perfil = null; mostrarPantalla('login'); }
+
+// ============================================================
+// Navegación por secciones
+// ============================================================
+function irASeccion(nombre, opciones){
+  document.querySelectorAll('nav.secciones button').forEach(b=>b.classList.toggle('active', b.dataset.sec===nombre));
+  document.querySelectorAll('.seccion').forEach(s=>s.classList.toggle('activa', s.id==='sec-'+nombre));
+  window.scrollTo({top:0, behavior:'smooth'});
+
+  // Cada sección carga lo suyo al entrar, para no pedir datos que no se están viendo
+  if(nombre === 'inventario'){
+    if(opciones?.filtro){ document.getElementById('qr-filtro').value = opciones.filtro; }
+    cargarQRs();
+  }
+  if(nombre === 'movimientos') cargarMovimientos();
+  if(nombre === 'bodegas'){ cargarVistaGeneral(); cargarGestionBodegas(); prepararTraspaso(); }
+  if(nombre === 'equipo') cargarEquipo();
+  if(nombre === 'analisis') poblarSelectorProductos().then(cargarGrafico);
+  if(nombre === 'suscripcion') cargarSuscripcion();
+}
+
+// ============================================================
+// Init y refresco
+// ============================================================
+async function init(){
+  await cargarBodegas();
+  cargarResumen();
+  setInterval(()=>{ if(document.getElementById('sec-resumen').classList.contains('activa')) cargarResumen(); }, 8000);
+}
+
+async function cargarBodegas(){
+  const { data } = await sb.from('bodegas').select('*').eq('activo', true).order('nombre');
+  bodegas = data || [];
+  const sel = document.getElementById('select-bodega');
+  const previo = bodegaActual;
+  sel.innerHTML = `<option value="">🌐 Todas las bodegas</option>`
+    + bodegas.map(b=>`<option value="${b.id}">${b.nombre}</option>`).join('')
+    + `<option value="__add__">➕ Añadir bodega...</option>`;
+  sel.value = bodegas.some(b=>b.id===previo) ? previo : '';
+  bodegaActual = sel.value;
+}
+
+// El selector hace doble función: elegir bodega, o llevar a contratar una nueva.
+function onBodegaChange(){
+  const sel = document.getElementById('select-bodega');
+  if(sel.value === '__add__'){
+    sel.value = bodegaActual || '';
+    irASeccion('suscripcion');
+    document.getElementById('card-plan').scrollIntoView({behavior:'smooth', block:'center'});
+    return;
+  }
+  bodegaActual = sel.value;
+  refrescarSeccionActual();
+}
+
+// Lleva a Suscripción y resalta la tarjeta del plan. Sirve también cuando ya
+// estás en esa sección (donde cambiar de sección sola no se notaría).
+function irAPlan(){
+  irASeccion('suscripcion');
+  const card = document.getElementById('card-plan');
+  card.scrollIntoView({behavior:'smooth', block:'center'});
+  card.style.outline = '3px solid var(--green)';
+  setTimeout(()=>{ card.style.outline = ''; }, 2000);
+}
+
+function refrescarSeccionActual(){
+  const activa = document.querySelector('.seccion.activa')?.id?.replace('sec-','') || 'resumen';
+  if(activa === 'resumen') cargarResumen();
+  else irASeccion(activa);
+}
+
+async function productosDeBodega(){
+  let q = sb.from('productos_con_estado').select('*').eq('activo', true);
+  if(bodegaActual) q = q.eq('bodega_id', bodegaActual);
+  const { data } = await q;
+  return data || [];
+}
+
+// ============================================================
+// SECCIÓN: Resumen
+// ============================================================
+async function cargarResumen(){
+  const productos = await productosDeBodega();
+  document.getElementById('resumen-alcance').textContent = bodegaActual
+    ? 'Estado de ' + (bodegas.find(b=>b.id===bodegaActual)?.nombre || 'esta bodega')
+    : 'Estado general de todas tus bodegas';
+
+  document.getElementById('kpi-skus').textContent = productos.length;
+  document.getElementById('kpi-unidades').textContent = productos.reduce((s,p)=>s+p.stock_actual,0);
+  document.getElementById('kpi-valor').textContent = trazi_fmtCLP(productos.reduce((s,p)=>s+Number(p.valor_inventario),0));
+
+  const vencimiento = productos.filter(p=>p.vencimiento_proximo).sort((a,b)=>(a.dias_para_vencer??999)-(b.dias_para_vencer??999));
+  const stockBajo = productos.filter(p=>p.stock_bajo).sort((a,b)=>a.stock_actual-b.stock_actual);
+  document.getElementById('kpi-alertas').textContent = productos.filter(p=>p.stock_bajo||p.vencimiento_proximo).length;
+
+  const nombreBodega = id => bodegas.find(b=>b.id===id)?.nombre || '';
+  const filaAlerta = (p, sub) => `
+    <div class="lista-item clickable" onclick="abrirDetalle('${p.id}')">
+      <div><div class="a-main">${p.nombre}</div><div class="a-sub">${sub}${bodegaActual?'':' · '+nombreBodega(p.bodega_id)}</div></div>
+      <span class="badge badge-red">${p.stock_actual}</span>
+    </div>`;
+
+  document.getElementById('cnt-vencimiento').textContent = vencimiento.length || '';
+  document.getElementById('lista-alertas-vencimiento').innerHTML = vencimiento.length
+    ? vencimiento.slice(0,6).map(p=>filaAlerta(p, `Vence en ${p.dias_para_vencer} día(s)`)).join('')
+    : '<div class="empty">Nada por vencer 👍</div>';
+
+  document.getElementById('cnt-stock').textContent = stockBajo.length || '';
+  document.getElementById('lista-alertas-stock').innerHTML = stockBajo.length
+    ? stockBajo.slice(0,6).map(p=>filaAlerta(p, `Mínimo: ${p.stock_minimo}`)).join('')
+    : '<div class="empty">Stock sano 👍</div>';
+
+  // Sin movimiento en 30 días: capital detenido
+  const hace30 = new Date(Date.now() - 30*86400000).toISOString();
+  let qm = sb.from('movimientos').select('producto_id').gte('fecha', hace30).eq('deshecho', false);
+  const { data: recientes } = await qm;
+  const conMovimiento = new Set((recientes||[]).map(m=>m.producto_id));
+  const sinMov = productos.filter(p=>!conMovimiento.has(p.id) && p.stock_actual>0)
+    .sort((a,b)=>Number(b.valor_inventario)-Number(a.valor_inventario));
+  document.getElementById('cnt-sinmov').textContent = sinMov.length || '';
+  document.getElementById('lista-alertas-sinmov').innerHTML = sinMov.length
+    ? sinMov.slice(0,6).map(p=>`
+      <div class="lista-item clickable" onclick="abrirDetalle('${p.id}')">
+        <div><div class="a-main">${p.nombre}</div><div class="a-sub">Sin movimiento hace 30+ días${bodegaActual?'':' · '+nombreBodega(p.bodega_id)}</div></div>
+        <span class="badge badge-grey">${trazi_fmtCLP(p.valor_inventario)}</span>
+      </div>`).join('')
+    : '<div class="empty">Todo rotando 👍</div>';
+
+  // Últimos movimientos (vista corta)
+  let q = sb.from('movimientos').select('*, productos!inner(nombre, bodega_id)')
+    .eq('deshecho', false).order('fecha',{ascending:false}).limit(6);
+  if(bodegaActual) q = q.eq('productos.bodega_id', bodegaActual);
+  const { data: movs } = await q;
+  document.getElementById('ultimos-movimientos').innerHTML = (movs && movs.length)
+    ? movs.map(m=>`
+      <div class="lista-item clickable" onclick="abrirDetalle('${m.producto_id}')">
+        <div>
+          <div class="a-main">${m.productos?.nombre || '—'}</div>
+          <div class="a-sub">${m.operario_nombre} · ${new Date(m.fecha).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>
+        </div>
+        <span class="badge ${TRAZI_TIPO_BADGE[m.tipo]}">${TRAZI_TIPO_LABEL[m.tipo]}${m.cantidad>0?' '+m.cantidad:''}</span>
+      </div>`).join('')
+    : '<div class="empty">Sin movimientos todavía</div>';
+}
+
+function renderBannerSuscripcion(){
+  const t = perfil.tenant;
+  const el = document.getElementById('banner-suscripcion');
+  if(!t){ el.innerHTML=''; return; }
+  if(t.subscription_status === 'trialing'){
+    const dias = Math.max(0, Math.ceil((new Date(t.trial_ends_at) - new Date())/86400000));
+    el.innerHTML = `<div class="banner banner-warn">⏳ Prueba gratuita: te quedan ${dias} día(s). <a href="#" onclick="irAPlan();return false;">Activar plan</a></div>`;
+  } else if(!trazi_subscriptionOk(t)){
+    el.innerHTML = `<div class="banner banner-danger">🔒 Suscripción ${ESTADO_SUB_LABEL[t.subscription_status]||t.subscription_status}. El registro de movimientos está bloqueado. <a href="#" onclick="irAPlan();return false;">Reactivar</a></div>`;
+  } else el.innerHTML = '';
+}
+</script>
+<script>
+// ============================================================
+// SECCIÓN: Inventario (grilla de QR)
+// ============================================================
+// Filtro y orden compartido — misma semántica que la app del operario.
+function traziFiltrarOrdenar(productos, {texto='', filtro='todos', orden='nombre'} = {}){
+  const q = texto.toLowerCase().trim();
+  let lista = !q ? productos.slice() : productos.filter(p =>
+    p.nombre.toLowerCase().includes(q) ||
+    p.codigo_interno.toLowerCase().includes(q) ||
+    (p.lote||'').toLowerCase().includes(q));
+
+  if(filtro === 'alerta') lista = lista.filter(p => p.stock_bajo || p.vencimiento_proximo);
+  else if(filtro === 'stock_bajo') lista = lista.filter(p => p.stock_bajo);
+  else if(filtro === 'por_vencer') lista = lista.filter(p => p.vencimiento_proximo);
+  else if(filtro === 'sin_stock') lista = lista.filter(p => p.stock_actual === 0);
+  else if(filtro === 'ok') lista = lista.filter(p => !p.stock_bajo && !p.vencimiento_proximo);
+
+  const sinFecha = Number.MAX_SAFE_INTEGER;
+  const orders = {
+    nombre: (a,b) => a.nombre.localeCompare(b.nombre,'es'),
+    stock_asc: (a,b) => a.stock_actual - b.stock_actual,
+    stock_desc: (a,b) => b.stock_actual - a.stock_actual,
+    vencimiento: (a,b) => (a.dias_para_vencer ?? sinFecha) - (b.dias_para_vencer ?? sinFecha),
+    valor_desc: (a,b) => Number(b.valor_inventario) - Number(a.valor_inventario),
+    reciente: (a,b) => new Date(b.creado_en) - new Date(a.creado_en),
+  };
+  return lista.sort(orders[orden] || orders.nombre);
+}
+
+async function cargarQRs(){ productosQR = await productosDeBodega(); renderQRs(); }
+
+function renderQRs(){
+  const lista = traziFiltrarOrdenar(productosQR, {
+    texto: document.getElementById('qr-buscar').value,
+    filtro: document.getElementById('qr-filtro').value,
+    orden: document.getElementById('qr-orden').value,
+  });
+  document.getElementById('qr-count').textContent = `${lista.length} de ${productosQR.length}`;
+  const cont = document.getElementById('qr-grid');
+  if(!lista.length){ cont.innerHTML = '<div class="empty">Ningún producto coincide con el filtro</div>'; return; }
+  const nombreBodega = id => bodegas.find(b=>b.id===id)?.nombre || '';
+  cont.innerHTML = lista.map(p => {
+    const alertas = [];
+    if(p.stock_bajo) alertas.push('<span class="badge badge-red">📉 Bajo</span>');
+    if(p.vencimiento_proximo) alertas.push(`<span class="badge badge-red">⏰ ${p.dias_para_vencer}d</span>`);
+    return `<div class="qr-card ${(p.stock_bajo||p.vencimiento_proximo)?'alerta':''}" onclick="abrirDetalle('${p.id}')">
+      <canvas id="qrc-${p.id}"></canvas>
+      <div class="qn">${p.nombre}</div>
+      <div class="qc">${p.codigo_interno}${p.lote ? ' · '+p.lote : ''}</div>
+      <div class="qc"><strong>${p.stock_actual}</strong> ${p.unidad_medida}</div>
+      ${bodegaActual ? '' : `<div class="qc">${nombreBodega(p.bodega_id)}</div>`}
+      ${alertas.length ? `<div style="margin-top:6px;">${alertas.join(' ')}</div>` : ''}
+    </div>`;
+  }).join('');
+  lista.forEach(p => { const c = document.getElementById('qrc-'+p.id);
+    if(c) QRCode.toCanvas(c, p.codigo_interno, {width:130, color:{dark:'#1B1B1B', light:'#ffffff'}}); });
+}
+
+// ============================================================
+// SECCIÓN: Movimientos (con filtros y scroll)
+// ============================================================
+async function cargarMovimientos(){
+  const dias = Number(document.getElementById('mov-periodo').value);
+  let q = sb.from('movimientos')
+    .select('*, productos!inner(nombre, bodega_id)')
+    .eq('deshecho', false)
+    .order('fecha', {ascending:false})
+    .limit(500);
+  if(dias > 0) q = q.gte('fecha', new Date(Date.now() - dias*86400000).toISOString());
+  if(bodegaActual) q = q.eq('productos.bodega_id', bodegaActual);
+  const { data } = await q;
+  movimientosCargados = data || [];
+
+  // El selector de personas se arma con quienes realmente aparecen en el período
+  const personas = [...new Set(movimientosCargados.map(m=>m.operario_nombre))].sort((a,b)=>a.localeCompare(b,'es'));
+  const selP = document.getElementById('mov-persona');
+  const previo = selP.value;
+  selP.innerHTML = '<option value="">Todas las personas</option>' + personas.map(p=>`<option value="${p}">${p}</option>`).join('');
+  if(personas.includes(previo)) selP.value = previo;
+
+  renderMovimientos();
+}
+
+function renderMovimientos(){
+  const texto = document.getElementById('mov-buscar').value.toLowerCase().trim();
+  const tipo = document.getElementById('mov-tipo').value;
+  const persona = document.getElementById('mov-persona').value;
+
+  let lista = movimientosCargados;
+  if(tipo) lista = lista.filter(m => m.tipo === tipo);
+  if(persona) lista = lista.filter(m => m.operario_nombre === persona);
+  if(texto) lista = lista.filter(m =>
+    (m.productos?.nombre||'').toLowerCase().includes(texto) ||
+    (m.nota||'').toLowerCase().includes(texto) ||
+    (m.destino_muestra||'').toLowerCase().includes(texto));
+
+  document.getElementById('mov-count').textContent = `${lista.length} de ${movimientosCargados.length}`;
+  const nombreBodega = id => bodegas.find(b=>b.id===id)?.nombre || '—';
+  document.getElementById('tabla-movimientos').innerHTML = lista.length ? lista.map(m=>`
+    <tr class="clickable" onclick="abrirDetalle('${m.producto_id}')">
+      <td class="muted" style="white-space:nowrap;">${new Date(m.fecha).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
+      <td>${m.productos?.nombre || '—'}</td>
+      <td class="muted">${nombreBodega(m.productos?.bodega_id)}</td>
+      <td><span class="badge ${TRAZI_TIPO_BADGE[m.tipo]}">${TRAZI_TIPO_LABEL[m.tipo]}</span></td>
+      <td><strong>${m.cantidad>0 ? m.cantidad : '—'}</strong></td>
+      <td class="muted">${m.operario_nombre}</td>
+      <td class="muted" style="font-size:11.5px;">${m.nota || m.destino_muestra || ''}</td>
+    </tr>`).join('')
+    : `<tr><td colspan="7" class="empty">Ningún movimiento coincide con los filtros</td></tr>`;
+}
+
+function limpiarFiltrosMov(){
+  document.getElementById('mov-buscar').value = '';
+  document.getElementById('mov-tipo').value = '';
+  document.getElementById('mov-persona').value = '';
+  renderMovimientos();
+}
+
+// ============================================================
+// SECCIÓN: Bodegas — vista general
+// ============================================================
+async function cargarVistaGeneral(){
+  const [{ data: todasBodegas }, { data: productos }, { data: movs }] = await Promise.all([
+    sb.from('bodegas').select('*').eq('activo', true).order('nombre'),
+    sb.from('productos_con_estado').select('*').eq('activo', true),
+    sb.from('movimientos').select('fecha, productos!inner(bodega_id)').eq('deshecho', false).order('fecha',{ascending:false}).limit(400),
+  ]);
+  const bs = todasBodegas || [], prods = productos || [];
+  const ultimoPorBodega = {};
+  (movs||[]).forEach(m => {
+    const bid = m.productos?.bodega_id;
+    if(bid && !ultimoPorBodega[bid]) ultimoPorBodega[bid] = m.fecha;
+  });
+
+  let totProd=0, totUnid=0, totValor=0, totAlertas=0;
+  document.getElementById('tabla-vista-general').innerHTML = bs.length ? bs.map(b=>{
+    const pb = prods.filter(p=>p.bodega_id===b.id);
+    const unidades = pb.reduce((s,p)=>s+p.stock_actual,0);
+    const valor = pb.reduce((s,p)=>s+Number(p.valor_inventario),0);
+    const alertas = pb.filter(p=>p.stock_bajo||p.vencimiento_proximo).length;
+    totProd+=pb.length; totUnid+=unidades; totValor+=valor; totAlertas+=alertas;
+    const ult = ultimoPorBodega[b.id];
+    return `<tr class="clickable" onclick="verBodega('${b.id}')">
+      <td><strong>${b.nombre}</strong>${b.direccion?`<div class="muted" style="font-size:11px;">${b.direccion}</div>`:''}</td>
+      <td>${pb.length}</td>
+      <td>${unidades}</td>
+      <td>${trazi_fmtCLP(valor)}</td>
+      <td>${alertas ? `<span class="badge badge-red">${alertas}</span>` : '<span class="muted">—</span>'}</td>
+      <td class="muted">${ult ? new Date(ult).toLocaleDateString('es-CL') : 'sin actividad'}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="6" class="empty">Todavía no tienes bodegas</td></tr>';
+
+  document.getElementById('totales-generales').innerHTML = bs.length
+    ? `<strong>Total consolidado:</strong> ${bs.length} bodegas · ${totProd} productos · ${totUnid} unidades · <strong>${trazi_fmtCLP(totValor)}</strong>${totAlertas?` · <span style="color:var(--red);font-weight:700;">${totAlertas} alertas</span>`:''}`
+    : '';
+}
+
+function verBodega(bodegaId){
+  document.getElementById('select-bodega').value = bodegaId;
+  bodegaActual = bodegaId;
+  irASeccion('inventario');
+}
+
+// ============================================================
+// SECCIÓN: Bodegas — traspasos
+// ============================================================
+async function prepararTraspaso(){
+  const { data: productos } = await sb.from('productos_con_estado').select('*').eq('activo', true);
+  const lista = (productos||[]).filter(p=>p.stock_actual>0).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  const nombreBodega = id => bodegas.find(b=>b.id===id)?.nombre || '';
+  document.getElementById('tr-producto').innerHTML = '<option value="">Selecciona un producto...</option>'
+    + lista.map(p=>`<option value="${p.id}" data-stock="${p.stock_actual}" data-bodega="${p.bodega_id}">${p.nombre} — ${nombreBodega(p.bodega_id)} (${p.stock_actual} disponibles)</option>`).join('');
+  onTraspasoProductoChange();
+}
+
+// El destino nunca puede ser la misma bodega donde ya está el producto
+function onTraspasoProductoChange(){
+  const opt = document.getElementById('tr-producto').selectedOptions[0];
+  const stock = opt?.dataset?.stock;
+  const bodegaOrigen = opt?.dataset?.bodega;
+  document.getElementById('tr-disponible').textContent = stock ? `(máximo ${stock})` : '';
+  document.getElementById('tr-cantidad').max = stock || '';
+  document.getElementById('tr-destino').innerHTML = '<option value="">Selecciona destino...</option>'
+    + bodegas.filter(b=>b.id !== bodegaOrigen).map(b=>`<option value="${b.id}">${b.nombre}</option>`).join('');
+}
+
+async function ejecutarTraspaso(){
+  const errEl = document.getElementById('tr-error');
+  const resEl = document.getElementById('tr-resultado');
+  errEl.textContent = ''; resEl.innerHTML = '';
+  const productoId = document.getElementById('tr-producto').value;
+  const destinoId = document.getElementById('tr-destino').value;
+  const cantidad = parseInt(document.getElementById('tr-cantidad').value, 10);
+  const motivo = document.getElementById('tr-motivo').value.trim();
+
+  if(!productoId){ errEl.textContent = 'Elige el producto a mover'; return; }
+  if(!destinoId){ errEl.textContent = 'Elige la bodega de destino'; return; }
+  if(!cantidad || cantidad <= 0){ errEl.textContent = 'Indica cuántas unidades quieres mover'; return; }
+
+  const nombreProducto = document.getElementById('tr-producto').selectedOptions[0].textContent.split(' — ')[0];
+  const nombreDestino = document.getElementById('tr-destino').selectedOptions[0].textContent;
+  if(!confirm(`¿Traspasar ${cantidad} unidad(es) de "${nombreProducto}" a ${nombreDestino}?\n\nQuedará registrado en el historial de ambas bodegas.`)) return;
+
+  const { error } = await sb.rpc('traspasar_stock', {
+    p_producto_id: productoId, p_bodega_destino_id: destinoId,
+    p_cantidad: cantidad, p_motivo: motivo || null,
+  });
+  if(error){ errEl.textContent = error.message; return; }
+
+  resEl.innerHTML = `<div class="ok-box">✓ Traspaso realizado: ${cantidad} unidad(es) de <strong>${nombreProducto}</strong> a <strong>${nombreDestino}</strong>.</div>`;
+  document.getElementById('tr-cantidad').value = '';
+  document.getElementById('tr-motivo').value = '';
+  await prepararTraspaso();
+  cargarVistaGeneral();
+}
+
+// ============================================================
+// SECCIÓN: Bodegas — gestión y accesos
+// ============================================================
+async function cargarGestionBodegas(){
+  const [{ data: todasBodegas }, { data: equipo }, { data: accesos }] = await Promise.all([
+    sb.from('bodegas').select('*').eq('activo', true).order('nombre'),
+    sb.from('profiles').select('id, nombre, role, activo').eq('activo', true).order('nombre'),
+    sb.from('bodega_accesos').select('bodega_id, profile_id'),
+  ]);
+  const operarios = (equipo||[]).filter(u => u.role === 'operator');
+  const tieneAcceso = new Set((accesos||[]).map(a => a.bodega_id+'|'+a.profile_id));
+  const t = perfil.tenant;
+  document.getElementById('bodegas-cupo-label').textContent =
+    `${(todasBodegas||[]).length} de ${t.bodegas_contratadas} del plan`;
+
+  document.getElementById('gestion-bodegas').innerHTML = (todasBodegas && todasBodegas.length)
+    ? todasBodegas.map(b => `
+      <div class="bodega-fila">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+          <div>
+            <div class="bn">${b.nombre}</div>
+            <div class="muted" style="font-size:12px;">${b.direccion || 'Sin dirección'}</div>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="eliminarBodega('${b.id}', ${JSON.stringify(b.nombre)})">🗑️ Eliminar</button>
+        </div>
+        <div class="accesos-lista">
+          ${operarios.length ? operarios.map(u => `
+            <label class="acceso-item">
+              <input type="checkbox" ${tieneAcceso.has(b.id+'|'+u.id) ? 'checked' : ''}
+                     onchange="cambiarAcceso('${u.id}','${b.id}',this.checked)">
+              ${u.nombre}
+            </label>`).join('')
+            : '<span class="muted" style="font-size:12px;">Aún no tienes operarios. Créalos en la sección Equipo.</span>'}
+        </div>
+      </div>`).join('')
+    : '<div class="empty">Todavía no tienes bodegas. Crea la primera abajo.</div>';
+}
+
+async function cambiarAcceso(profileId, bodegaId, permitir){
+  const { error } = await sb.rpc('set_acceso_bodega', {
+    p_profile_id: profileId, p_bodega_id: bodegaId, p_permitir: permitir });
+  if(error){ alert(error.message); cargarGestionBodegas(); }
+}
+
+async function eliminarBodega(bodegaId, nombre){
+  const { count } = await sb.from('productos').select('id', {count:'exact', head:true})
+    .eq('bodega_id', bodegaId).eq('activo', true);
+  const aviso = count ? `\n\n⚠️ Tiene ${count} producto(s) activo(s), que también se eliminarán (su historial se conserva).` : '';
+  if(!confirm(`¿Eliminar la bodega "${nombre}"?${aviso}\n\nLibera un cupo de tu plan.`)) return;
+  const { error } = await sb.rpc('eliminar_bodega', { p_bodega_id: bodegaId });
+  if(error){ alert(error.message); return; }
+  await cargarBodegas();
+  cargarGestionBodegas(); cargarVistaGeneral(); prepararTraspaso(); cargarSuscripcion();
+}
+
+async function crearBodega(){
+  const errEl = document.getElementById('nb-error');
+  errEl.textContent = '';
+  const nombre = document.getElementById('nb-nombre').value.trim();
+  if(!nombre){ errEl.textContent = 'Ponle un nombre a la bodega'; return; }
+  const { error } = await sb.rpc('crear_bodega', {
+    p_nombre: nombre, p_direccion: document.getElementById('nb-direccion').value.trim() || null });
+  if(error){ errEl.textContent = error.message; return; }
+  document.getElementById('nb-nombre').value = '';
+  document.getElementById('nb-direccion').value = '';
+  await cargarBodegas();
+  cargarGestionBodegas(); cargarVistaGeneral(); prepararTraspaso(); cargarSuscripcion();
+}
+</script>
+<script>
+// ============================================================
+// SECCIÓN: Equipo
+// ============================================================
+async function cargarEquipo(){
+  const [{ data: equipo }, { data: accesos }, { data: todasBodegas }] = await Promise.all([
+    sb.from('profiles').select('*').order('created_at'),
+    sb.from('bodega_accesos').select('bodega_id, profile_id'),
+    sb.from('bodegas').select('id, nombre').eq('activo', true),
+  ]);
+  const nombreBodega = id => (todasBodegas||[]).find(b=>b.id===id)?.nombre || '';
+  const accesosPorPersona = {};
+  (accesos||[]).forEach(a => {
+    accesosPorPersona[a.profile_id] = accesosPorPersona[a.profile_id] || [];
+    accesosPorPersona[a.profile_id].push(nombreBodega(a.bodega_id));
+  });
+
+  document.getElementById('equipo-count').textContent = (equipo||[]).length + ' cuentas';
+  document.getElementById('tabla-equipo').innerHTML = (equipo && equipo.length) ? equipo.map(u=>{
+    const susBodegas = ['owner','manager'].includes(u.role)
+      ? '<span class="muted">Todas</span>'
+      : (accesosPorPersona[u.id]?.length
+          ? accesosPorPersona[u.id].join(', ')
+          : '<span style="color:var(--red);">Sin acceso asignado</span>');
+    return `<tr>
+      <td><strong>${u.nombre}</strong></td>
+      <td><code style="font-size:12px;">${u.email}</code></td>
+      <td><span class="badge badge-grey">${ROLE_LABEL[u.role]||u.role}</span></td>
+      <td style="font-size:11.5px;">${susBodegas}</td>
+      <td>${u.activo ? '<span class="badge badge-green">Activa</span>' : '<span class="badge badge-grey">Desactivada</span>'}</td>
+      <td style="white-space:nowrap;">
+        ${u.role !== 'owner' ? `
+          <button class="btn btn-sm" onclick="resetPassword('${u.id}', ${JSON.stringify(u.nombre)})">🔑 Cambiar contraseña</button>
+          <button class="btn btn-sm" onclick="alternarUsuario('${u.id}', ${JSON.stringify(u.nombre)}, ${!u.activo})">${u.activo ? '🚫 Desactivar' : '✅ Reactivar'}</button>
+        ` : '<span class="muted" style="font-size:11px;">Cuenta principal</span>'}
+      </td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="6" class="empty">Sin usuarios aún</td></tr>';
+}
+
+function generarPassword(inputId){
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  const arr = new Uint32Array(12); crypto.getRandomValues(arr);
+  let p = ''; for(let i=0;i<12;i++) p += chars[arr[i] % chars.length];
+  document.getElementById(inputId).value = p;
+  return p;
+}
+
+async function crearUsuarioEquipo(){
+  const nombre = document.getElementById('nu-nombre').value.trim();
+  const email = document.getElementById('nu-email').value.trim();
+  const password = document.getElementById('nu-password').value;
+  const role = document.getElementById('nu-rol').value;
+  const errEl = document.getElementById('nu-error');
+  const resEl = document.getElementById('nu-resultado');
+  errEl.textContent = ''; resEl.innerHTML = '';
+  if(!nombre || !email || !password){ errEl.textContent = 'Completa nombre, correo y contraseña'; return; }
+  if(password.length < 8){ errEl.textContent = 'La contraseña debe tener al menos 8 caracteres'; return; }
+  try{
+    await trazi_callFunction('crear-usuario', { accion:'crear', nombre, email, password, role });
+    resEl.innerHTML = `<div class="ok-box">
+      <strong>✓ Cuenta creada para ${nombre}</strong><br><br>
+      Entrégale estos datos:<br>
+      Sitio: <strong>${location.origin}${role==='operator'?'/app/':'/dashboard/'}</strong><br>
+      Correo: <strong>${email}</strong><br>
+      Contraseña: <strong>${password}</strong><br><br>
+      <span style="font-size:12px;">Anótala ahora — por seguridad no se puede volver a consultar. Si se pierde, defines una nueva con "🔑 Cambiar contraseña".
+      ${role === 'operator' ? '<br>Recuerda darle acceso a sus bodegas en la sección Bodegas.' : ''}</span>
+    </div>`;
+    ['nu-nombre','nu-email','nu-password'].forEach(id=>document.getElementById(id).value='');
+    cargarEquipo(); cargarGestionBodegas();
+  }catch(e){ errEl.textContent = e.message; }
+}
+
+async function resetPassword(userId, nombre){
+  const nueva = prompt(`Nueva contraseña para ${nombre} (mínimo 8 caracteres).\n\nAnótala antes de aceptar: no se puede volver a consultar después.`);
+  if(nueva === null) return;
+  if(nueva.length < 8){ alert('La contraseña debe tener al menos 8 caracteres'); return; }
+  try{
+    await trazi_callFunction('crear-usuario', { accion:'reset_password', user_id: userId, password: nueva });
+    alert(`✓ Contraseña actualizada para ${nombre}.\n\nComunícasela directamente:\n${nueva}`);
+  }catch(e){ alert(e.message); }
+}
+
+async function alternarUsuario(userId, nombre, activar){
+  const msg = activar
+    ? `¿Reactivar la cuenta de ${nombre}? Podrá volver a iniciar sesión.`
+    : `¿Desactivar la cuenta de ${nombre}? No podrá iniciar sesión hasta que la reactives. Su historial se conserva.`;
+  if(!confirm(msg)) return;
+  try{
+    await trazi_callFunction('crear-usuario', { accion:'set_activo', user_id: userId, activo: activar });
+    cargarEquipo(); cargarGestionBodegas();
+  }catch(e){ alert(e.message); }
+}
+
+// ============================================================
+// SECCIÓN: Suscripción y pagos
+// ============================================================
+async function cargarSuscripcion(){
+  perfil = await trazi_getProfile();
+  const t = perfil.tenant;
+  if(!t){ document.getElementById('info-suscripcion').textContent = 'Sin empresa asociada.'; return; }
+  renderBannerSuscripcion();
+
+  const contratadas = t.bodegas_contratadas;
+  const extra = Math.max(0, contratadas - t.bodegas_incluidas);
+  const monto = Number(t.precio_base_clp) + extra * Number(t.precio_bodega_adicional_clp);
+
+  document.getElementById('info-suscripcion').innerHTML =
+    `Plan: <strong>${t.plan === 'pro' ? 'Pro' : 'Prueba gratuita'}</strong><br>` +
+    `Estado: <strong>${ESTADO_SUB_LABEL[t.subscription_status]||t.subscription_status}</strong><br>` +
+    `Total mensual: <strong style="font-size:17px;">${trazi_fmtCLP(monto)}</strong>` +
+    (t.subscription_status==='trialing' ? `<br>Prueba termina: ${new Date(t.trial_ends_at).toLocaleDateString('es-CL')}` : '') +
+    (t.current_period_end ? `<br>Próximo cobro: ${new Date(t.current_period_end).toLocaleDateString('es-CL')}` : '') +
+    `<br><br>${t.mp_preapproval_id
+      ? '✓ <strong>Tarjeta registrada.</strong> El cobro se hace solo cada mes.<br><span style="font-size:12px;">Para cambiarla, genera un nuevo link con "Activar / renovar plan".</span>'
+      : '<span style="font-size:12px;">Todavía no hay tarjeta registrada. Con "Activar / renovar plan" se ingresa una vez y el cobro mensual queda automático.</span>'}`;
+
+  const usadas = (bodegas||[]).length;
+  document.getElementById('info-bodegas-plan').innerHTML =
+    `Tienes <strong>${usadas} de ${contratadas}</strong> bodegas en uso.<br><br>` +
+    `$${Number(t.precio_base_clp).toLocaleString('es-CL')} incluye ${t.bodegas_incluidas} bodegas` +
+    (extra>0 ? `<br>+ ${extra} adicional${extra>1?'es':''} × $${Number(t.precio_bodega_adicional_clp).toLocaleString('es-CL')}` : '') +
+    `<br><strong>Total: ${trazi_fmtCLP(monto)}/mes</strong>` +
+    `<br><br><span style="font-size:12px;">Cada bodega extra suma $${Number(t.precio_bodega_adicional_clp).toLocaleString('es-CL')}/mes.</span>`;
+
+  document.getElementById('btn-cancelar-sub').style.display = ['active','past_due'].includes(t.subscription_status) ? '' : 'none';
+
+  // Precargar con el pagador ya usado, o con el correo del dueño
+  const inputPayer = document.getElementById('sub-payer-email');
+  if(!inputPayer.value){
+    if(t.mp_payer_email){ inputPayer.value = t.mp_payer_email; }
+    else {
+      const { data: owner } = await sb.from('profiles').select('email').eq('role','owner').limit(1).maybeSingle();
+      if(owner?.email) inputPayer.value = owner.email;
+    }
+  }
+
+  const { data: pagos } = await sb.from('pagos').select('*').order('fecha',{ascending:false}).limit(24);
+  const estadoLabel = { approved:'Aprobado', pending:'Pendiente', rejected:'Rechazado', refunded:'Reembolsado', cancelled:'Cancelado', in_process:'En proceso' };
+  const estadoBadge = { approved:'badge-green', pending:'badge-amber', rejected:'badge-red', refunded:'badge-grey', cancelled:'badge-grey', in_process:'badge-amber' };
+  document.getElementById('tabla-pagos').innerHTML = (pagos && pagos.length) ? pagos.map(p=>`
+    <tr>
+      <td class="muted">${new Date(p.fecha).toLocaleDateString('es-CL')}</td>
+      <td><strong>${trazi_fmtCLP(p.monto)}</strong></td>
+      <td><span class="badge ${estadoBadge[p.estado]||'badge-grey'}">${estadoLabel[p.estado]||p.estado}</span></td>
+      <td class="muted">${p.metodo_pago || '—'}</td>
+    </tr>`).join('')
+    : '<tr><td colspan="4" class="empty">Sin pagos registrados todavía — aparecerán acá apenas MercadoPago procese el primer cobro.</td></tr>';
+}
+
+async function ajustarBodegas(delta){
+  const errEl = document.getElementById('bodegas-plan-error');
+  errEl.textContent = '';
+  const t = perfil.tenant;
+  const nueva = t.bodegas_contratadas + delta;
+  const extra = Math.max(0, nueva - t.bodegas_incluidas);
+  const nuevoMonto = Number(t.precio_base_clp) + extra * Number(t.precio_bodega_adicional_clp);
+  const msg = delta > 0
+    ? `¿Contratar una bodega adicional?\n\nTu plan pasará a ${nueva} bodegas y ${trazi_fmtCLP(nuevoMonto)}/mes.`
+    : `¿Quitar una bodega del plan?\n\nQuedará en ${nueva} bodegas y ${trazi_fmtCLP(nuevoMonto)}/mes.`;
+  if(!confirm(msg)) return;
+  const { error } = await sb.rpc('ajustar_bodegas_contratadas', { p_nueva_cantidad: nueva });
+  if(error){ errEl.textContent = error.message; return; }
+  await cargarSuscripcion();
+  cargarGestionBodegas();
+  if(delta > 0) alert('Listo. Ya puedes crear la bodega nueva en la sección Bodegas.\n\nEl cobro se ajusta en tu próxima factura de MercadoPago.');
+}
+
+async function irACheckout(){
+  const btn = document.getElementById('btn-suscribir');
+  const resEl = document.getElementById('checkout-resultado');
+  btn.disabled = true; btn.textContent = 'Generando link...';
+  resEl.innerHTML = '';
+  try{
+    const payer = document.getElementById('sub-payer-email').value.trim();
+    const data = await trazi_callFunction('crear-suscripcion-mercadopago', {
+      back_url: location.href,
+      payer_email: payer || undefined,
+    });
+    resEl.innerHTML = `<div class="ok-box">
+      Link de pago por <strong>${trazi_fmtCLP(data.monto_mensual)}/mes</strong>.<br>
+      <a href="${data.checkout_url}" target="_blank" style="font-weight:700;">Abrir para pagar →</a><br><br>
+      <span style="font-size:12px;">Debe pagarlo <strong>${data.payer_email}</strong>, entrando con la cuenta de MercadoPago de ese correo.
+      Si lo va a pagar otra persona, cambia el correo de arriba y genera el link de nuevo.</span>
+    </div>`;
+  }catch(e){ resEl.innerHTML = `<div class="error-text">${e.message}</div>`; }
+  finally{ btn.disabled = false; btn.textContent = 'Activar / renovar plan'; }
+}
+
+async function cancelarSuscripcion(){
+  if(!confirm('¿Cancelar tu suscripción?\n\nSe detendrá el cobro mensual y no podrás registrar movimientos cuando termine el período pagado.')) return;
+  const btn = document.getElementById('btn-cancelar-sub');
+  btn.disabled = true;
+  try{
+    await trazi_callFunction('cancelar-suscripcion-mercadopago', {});
+    await cargarSuscripcion();
+  }catch(e){ alert(e.message); }
+  finally{ btn.disabled = false; }
+}
+
+// ============================================================
+// Modal de detalle de producto
+// ============================================================
+async function abrirDetalle(productoId){
+  productoDetalleId = productoId;
+  const { data: p, error } = await sb.from('productos_con_estado').select('*').eq('id', productoId).single();
+  if(error || !p){ alert('No se pudo cargar el producto'); return; }
+
+  document.getElementById('pd-nombre').textContent = p.nombre;
+  document.getElementById('pd-stock').textContent = `${p.stock_actual} ${p.unidad_medida}`;
+  document.getElementById('pd-valor').textContent = trazi_fmtCLP(p.valor_inventario);
+  document.getElementById('pd-bodega').textContent = p.bodega_nombre;
+
+  const badges = [];
+  if(!p.activo) badges.push('<span class="badge badge-grey">QR eliminado</span>');
+  if(p.stock_bajo) badges.push('<span class="badge badge-red">Stock bajo el mínimo</span>');
+  if(p.vencimiento_proximo) badges.push(`<span class="badge badge-red">Vence en ${p.dias_para_vencer} día(s)</span>`);
+  document.getElementById('pd-badges').innerHTML = badges.join(' ');
+
+  document.getElementById('pd-in-nombre').value = p.nombre;
+  document.getElementById('pd-in-precio').value = p.precio_costo;
+  document.getElementById('pd-in-stockmin').value = p.stock_minimo;
+  document.getElementById('pd-in-lote').value = p.lote || '';
+  document.getElementById('pd-in-vencimiento').value = p.fecha_vencimiento || '';
+  document.getElementById('pd-in-nuevostock').value = p.stock_actual;
+  document.getElementById('pd-in-nota').value = '';
+  document.getElementById('pd-error').textContent = '';
+  document.getElementById('btn-eliminar-producto').style.display = p.activo ? '' : 'none';
+  document.querySelectorAll('#modal-producto input').forEach(i => i.disabled = !p.activo);
+
+  const { data: hist } = await sb.from('movimientos').select('*').eq('producto_id', productoId).order('fecha',{ascending:false}).limit(100);
+  document.getElementById('pd-hist-count').textContent = hist ? `(${hist.length})` : '';
+  document.getElementById('pd-historial').innerHTML = (hist && hist.length) ? hist.map(m=>`
+    <tr>
+      <td class="muted" style="white-space:nowrap;">${new Date(m.fecha).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
+      <td><span class="badge ${TRAZI_TIPO_BADGE[m.tipo]}">${TRAZI_TIPO_LABEL[m.tipo]}</span></td>
+      <td>${m.cantidad>0 ? m.cantidad : '—'}</td>
+      <td class="muted">${m.operario_nombre}</td>
+      <td class="muted" style="font-size:11px;">${m.nota || m.destino_muestra || ''}</td>
+    </tr>`).join('') : '<tr><td colspan="5" class="empty">Sin movimientos</td></tr>';
+
+  document.getElementById('modal-producto').classList.remove('hidden');
+}
+
+function cerrarDetalle(){
+  document.getElementById('modal-producto').classList.add('hidden');
+  productoDetalleId = null;
+}
+
+async function guardarDetalle(){
+  const errEl = document.getElementById('pd-error');
+  errEl.textContent = '';
+  const { error } = await sb.rpc('actualizar_producto', {
+    p_producto_id: productoDetalleId,
+    p_nombre: document.getElementById('pd-in-nombre').value.trim(),
+    p_precio_costo: Number(document.getElementById('pd-in-precio').value),
+    p_stock_minimo: parseInt(document.getElementById('pd-in-stockmin').value, 10),
+    p_fecha_vencimiento: document.getElementById('pd-in-vencimiento').value || null,
+    p_lote: document.getElementById('pd-in-lote').value.trim() || null,
+    p_nuevo_stock: parseInt(document.getElementById('pd-in-nuevostock').value, 10),
+    p_nota: document.getElementById('pd-in-nota').value.trim() || null,
+  });
+  if(error){ errEl.textContent = error.message; return; }
+  cerrarDetalle();
+  refrescarSeccionActual();
+}
+
+async function eliminarProductoDetalle(){
+  if(!confirm('¿Eliminar este QR?\n\nDejará de aparecer en las listas activas, pero su historial completo se conserva.')) return;
+  const { error } = await sb.rpc('eliminar_producto', { p_producto_id: productoDetalleId });
+  if(error){ document.getElementById('pd-error').textContent = error.message; return; }
+  cerrarDetalle();
+  refrescarSeccionActual();
+}
+</script>
+<script>
+// ============================================================
+// SECCIÓN: Análisis — gráficos
+// ============================================================
+function cambiarGrafico(tipo){
+  tipoGraficoActual = tipo;
+  document.querySelectorAll('.graf-tab').forEach(b=>b.classList.toggle('active', b.dataset.tipo===tipo));
+  document.getElementById('graf-agrupacion').style.display =
+    ['mermas_tiempo','flujo_tiempo'].includes(tipo) ? '' : 'none';
+  cargarGrafico();
+}
+
+function paleta(n){
+  const colores=['#2E7D32','#1B5E20','#3FE07A','#B7791F','#C0392B','#6B7280','#0E7490','#7C3AED','#DB2777','#F59E0B'];
+  return Array.from({length:n}, (_,i)=>colores[i%colores.length]);
+}
+
+function cubeteTemporal(fecha, agrupacion){
+  const d = new Date(fecha);
+  if(agrupacion === 'dia') return d.toISOString().slice(0,10);
+  if(agrupacion === 'semana'){
+    const lunes = new Date(d);
+    lunes.setDate(d.getDate() - ((d.getDay()+6) % 7));
+    return lunes.toISOString().slice(0,10);
+  }
+  return d.toISOString().slice(0,7);
+}
+
+function etiquetaCubete(key, agrupacion){
+  if(agrupacion === 'mes'){
+    const [a,m] = key.split('-');
+    return new Date(a, Number(m)-1, 1).toLocaleDateString('es-CL', {month:'short', year:'2-digit'});
+  }
+  const d = new Date(key + 'T00:00:00');
+  return agrupacion === 'semana'
+    ? 'Sem ' + d.toLocaleDateString('es-CL', {day:'2-digit', month:'short'})
+    : d.toLocaleDateString('es-CL', {day:'2-digit', month:'short'});
+}
+
+async function poblarSelectorProductos(){
+  const sel = document.getElementById('graf-producto');
+  const previo = sel.value;
+  const productos = await productosDeBodega();
+  sel.innerHTML = '<option value="">Todos los productos</option>' +
+    productos.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'))
+      .map(p=>`<option value="${p.id}">${p.nombre}${p.lote ? ' · '+p.lote : ''}</option>`).join('');
+  if(productos.some(p=>p.id===previo)) sel.value = previo;
+}
+
+async function movimientosDelPeriodo(){
+  const dias = Number(document.getElementById('graf-periodo').value);
+  const desde = new Date(Date.now() - dias*86400000).toISOString();
+  const productoId = document.getElementById('graf-producto').value;
+  let q = sb.from('movimientos')
+    .select('tipo, cantidad, fecha, producto_id, productos!inner(nombre, bodega_id, precio_costo)')
+    .eq('deshecho', false).gte('fecha', desde)
+    .in('tipo', ['ENTRADA','SALIDA','MUESTRA'])
+    .order('fecha');
+  if(bodegaActual) q = q.eq('productos.bodega_id', bodegaActual);
+  if(productoId) q = q.eq('producto_id', productoId);
+  const { data } = await q;
+  return data || [];
+}
+
+async function cargarGrafico(){
+  const tipo = tipoGraficoActual;
+  const empty = document.getElementById('grafico-empty');
+  const canvas = document.getElementById('chart-reporte');
+  const infoEl = document.getElementById('grafico-info');
+  const resumenEl = document.getElementById('grafico-resumen');
+  const agrupacion = document.getElementById('graf-agrupacion').value;
+
+  const pintar = cfg => {
+    empty.style.display='none'; canvas.style.display='block';
+    if(chartInstance) chartInstance.destroy();
+    chartInstance = new Chart(canvas.getContext('2d'), cfg);
+  };
+  const vaciar = msg => {
+    empty.textContent = msg || 'Sin datos en este período.';
+    empty.style.display='block'; canvas.style.display='none';
+    infoEl.textContent=''; resumenEl.innerHTML='';
+    if(chartInstance){ chartInstance.destroy(); chartInstance=null; }
+  };
+
+  if(tipo === 'valorizacion'){
+    const productos = await productosDeBodega();
+    if(!productos.length) return vaciar('Sin productos para mostrar.');
+    const orden = productos.slice().sort((a,b)=>Number(b.valor_inventario)-Number(a.valor_inventario));
+    const total = orden.reduce((s,p)=>s+Number(p.valor_inventario),0);
+    if(total === 0) return vaciar('Tu inventario no tiene valor registrado (revisa los precios de costo).');
+    infoEl.textContent = trazi_fmtCLP(total) + ' en total';
+    const top = orden[0];
+    resumenEl.innerHTML = `💡 <strong>${top.nombre}</strong> concentra ${((Number(top.valor_inventario)/total)*100).toFixed(0)}% del valor de tu inventario (${trazi_fmtCLP(top.valor_inventario)}).`;
+    return pintar({ type:'doughnut',
+      data:{ labels: orden.map(p=>p.nombre), datasets:[{ data: orden.map(p=>Number(p.valor_inventario)), backgroundColor: paleta(orden.length) }]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ title:{display:true, text:'¿Dónde está tu capital? Valor por producto'},
+          tooltip:{ callbacks:{ label: c => `${c.label}: ${trazi_fmtCLP(c.raw)} (${((c.raw/total)*100).toFixed(1)}%)` } } } } });
+  }
+
+  const movs = await movimientosDelPeriodo();
+  if(!movs.length) return vaciar();
+
+  if(tipo === 'mermas_tiempo'){
+    const mermas = movs.filter(m => m.tipo === 'MUESTRA');
+    if(!mermas.length) return vaciar('No hubo mermas en este período. 👍');
+    const cubos = {};
+    for(const m of mermas){
+      const k = cubeteTemporal(m.fecha, agrupacion);
+      cubos[k] = cubos[k] || { unidades:0, costo:0 };
+      cubos[k].unidades += m.cantidad;
+      cubos[k].costo += m.cantidad * Number(m.productos?.precio_costo || 0);
+    }
+    const keys = Object.keys(cubos).sort();
+    const totalU = mermas.reduce((s,m)=>s+m.cantidad,0);
+    const totalC = keys.reduce((s,k)=>s+cubos[k].costo,0);
+    infoEl.textContent = `${totalU} unidades · ${trazi_fmtCLP(totalC)}`;
+    resumenEl.innerHTML = `💸 En este período perdiste <strong>${totalU} unidades</strong> en mermas, equivalentes a <strong>${trazi_fmtCLP(totalC)}</strong> a precio de costo.`;
+    return pintar({ type:'bar',
+      data:{ labels: keys.map(k=>etiquetaCubete(k,agrupacion)), datasets:[
+        { type:'bar', label:'Unidades perdidas', data: keys.map(k=>cubos[k].unidades), backgroundColor:'#B7791F', yAxisID:'y' },
+        { type:'line', label:'Costo de la merma', data: keys.map(k=>cubos[k].costo), borderColor:'#C0392B', backgroundColor:'#C0392B', yAxisID:'y1', tension:.3 },
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ title:{display:true, text:'Merma en el tiempo'} },
+        scales:{ y:{ beginAtZero:true, position:'left', title:{display:true,text:'Unidades'} },
+                 y1:{ beginAtZero:true, position:'right', grid:{drawOnChartArea:false}, title:{display:true,text:'CLP'},
+                      ticks:{ callback: v => '$'+Number(v).toLocaleString('es-CL') } } } } });
+  }
+
+  if(tipo === 'flujo_tiempo'){
+    const cubos = {};
+    for(const m of movs){
+      const k = cubeteTemporal(m.fecha, agrupacion);
+      cubos[k] = cubos[k] || { ENTRADA:0, SALIDA:0, MUESTRA:0 };
+      cubos[k][m.tipo] += m.cantidad;
+    }
+    const keys = Object.keys(cubos).sort();
+    const totalE = movs.filter(m=>m.tipo==='ENTRADA').reduce((s,m)=>s+m.cantidad,0);
+    const totalS = movs.filter(m=>m.tipo==='SALIDA').reduce((s,m)=>s+m.cantidad,0);
+    const neto = totalE - totalS;
+    infoEl.textContent = `+${totalE} / -${totalS}`;
+    resumenEl.innerHTML = `📦 Entraron <strong>${totalE}</strong> y salieron <strong>${totalS}</strong> unidades. ` +
+      (neto >= 0 ? `Tu stock creció en <strong>${neto}</strong>.` : `Tu stock bajó en <strong>${Math.abs(neto)}</strong>.`);
+    return pintar({ type:'bar',
+      data:{ labels: keys.map(k=>etiquetaCubete(k,agrupacion)), datasets:[
+        { label:'Entradas', data: keys.map(k=>cubos[k].ENTRADA), backgroundColor:'#2E7D32' },
+        { label:'Salidas', data: keys.map(k=>-cubos[k].SALIDA), backgroundColor:'#C0392B' },
+        { label:'Mermas', data: keys.map(k=>-cubos[k].MUESTRA), backgroundColor:'#B7791F' },
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ title:{display:true, text:'Entradas vs salidas'},
+          tooltip:{ callbacks:{ label: c => `${c.dataset.label}: ${Math.abs(c.raw)} unidades` } } },
+        scales:{ x:{stacked:true}, y:{stacked:true, title:{display:true,text:'Unidades'}, ticks:{ callback: v => Math.abs(v) } } } } });
+  }
+
+  if(tipo === 'por_producto'){
+    const porProd = {};
+    for(const m of movs){
+      const n = m.productos?.nombre || '—';
+      porProd[n] = porProd[n] || { ENTRADA:0, SALIDA:0, MUESTRA:0 };
+      porProd[n][m.tipo] += m.cantidad;
+    }
+    const labels = Object.keys(porProd).sort((a,b)=>
+      (porProd[b].ENTRADA+porProd[b].SALIDA+porProd[b].MUESTRA) - (porProd[a].ENTRADA+porProd[a].SALIDA+porProd[a].MUESTRA));
+    infoEl.textContent = labels.length + ' productos con movimiento';
+    resumenEl.innerHTML = `🔎 <strong>${labels[0]}</strong> es el producto con más movimiento del período.`;
+    return pintar({ type:'bar',
+      data:{ labels, datasets:[
+        { label:'Entradas', data: labels.map(l=>porProd[l].ENTRADA), backgroundColor:'#2E7D32' },
+        { label:'Salidas', data: labels.map(l=>porProd[l].SALIDA), backgroundColor:'#C0392B' },
+        { label:'Mermas', data: labels.map(l=>porProd[l].MUESTRA), backgroundColor:'#B7791F' },
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false, indexAxis:'y',
+        plugins:{ title:{display:true, text:'Entradas y salidas por producto'} },
+        scales:{ x:{ beginAtZero:true, title:{display:true,text:'Unidades'} } } } });
+  }
+
+  if(tipo === 'rotacion'){
+    const productos = await productosDeBodega();
+    const salidas = {};
+    for(const m of movs){ if(m.tipo === 'SALIDA') salidas[m.producto_id] = (salidas[m.producto_id]||0) + m.cantidad; }
+    const filas = productos.map(p => ({
+      nombre: p.nombre, salidas: salidas[p.id] || 0, inmovilizado: Number(p.valor_inventario),
+    })).sort((a,b) => b.salidas - a.salidas);
+    if(!filas.length) return vaciar('Sin productos para analizar.');
+    const sinMovimiento = filas.filter(f => f.salidas === 0);
+    const capitalQuieto = sinMovimiento.reduce((s,f)=>s+f.inmovilizado, 0);
+    infoEl.textContent = `${filas.length - sinMovimiento.length} rotando · ${sinMovimiento.length} detenidos`;
+    resumenEl.innerHTML = sinMovimiento.length
+      ? `🚨 <strong>${sinMovimiento.length} producto(s)</strong> no tuvieron ninguna salida en este período, con <strong>${trazi_fmtCLP(capitalQuieto)}</strong> inmovilizados (en rojo).`
+      : '✅ Todos tus productos tuvieron movimiento en este período.';
+    return pintar({ type:'bar',
+      data:{ labels: filas.map(f=>f.nombre), datasets:[
+        { label:'Unidades despachadas', data: filas.map(f=>f.salidas),
+          backgroundColor: filas.map(f=>f.salidas === 0 ? '#C0392B' : '#2E7D32') } ]},
+      options:{ responsive:true, maintainAspectRatio:false, indexAxis:'y',
+        plugins:{ title:{display:true, text:'Rotación: qué se mueve y qué está detenido'},
+          tooltip:{ callbacks:{ afterLabel: c => filas[c.dataIndex].salidas === 0
+            ? `⚠️ Sin salidas · ${trazi_fmtCLP(filas[c.dataIndex].inmovilizado)} detenidos` : '' } } },
+        scales:{ x:{ beginAtZero:true, title:{display:true,text:'Unidades que salieron'} } } } });
+  }
+}
+
+// ============================================================
+// Reportes CSV
+// ============================================================
+async function obtenerFilasReporte(tipo){
+  if(tipo === 'valorizacion'){
+    const productos = await productosDeBodega();
+    return productos.map(p => [p.nombre, p.codigo_interno, p.lote||'', p.bodega_nombre,
+      p.stock_actual, p.unidad_medida, p.precio_costo, p.valor_inventario, p.fecha_vencimiento||'']);
+  }
+  let q = sb.from('movimientos').select('*, productos!inner(nombre, codigo_interno, lote, bodega_id)')
+    .eq('deshecho', false).order('fecha', {ascending:false}).limit(3000);
+  if(bodegaActual) q = q.eq('productos.bodega_id', bodegaActual);
+  if(tipo === 'mermas') q = q.eq('tipo', 'MUESTRA');
+  const { data } = await q;
+  const nombreBodega = id => bodegas.find(b=>b.id===id)?.nombre || '';
+  return (data||[]).map(m => [new Date(m.fecha).toLocaleString('es-CL'), m.productos?.nombre||'',
+    m.productos?.codigo_interno||'', m.productos?.lote||'', nombreBodega(m.productos?.bodega_id),
+    TRAZI_TIPO_LABEL[m.tipo]||m.tipo, m.cantidad, m.operario_nombre, m.nota||m.destino_muestra||'']);
+}
+
+async function csvParaTipo(tipo){
+  const rows = await obtenerFilasReporte(tipo);
+  const headers = tipo === 'valorizacion'
+    ? ['Producto','Código','Lote','Bodega','Stock','Unidad','Precio costo','Valor total','Vencimiento']
+    : ['Fecha','Producto','Código','Lote','Bodega','Tipo','Cantidad','Persona','Nota'];
+  const nombres = { movimientos:'trazabilidad', mermas:'mermas', valorizacion:'valorizacion' };
+  return { headers, rows, filename: `trazipyme-${nombres[tipo]}-${new Date().toISOString().slice(0,10)}.csv` };
+}
+
+function descargar(tipo){
+  csvParaTipo(tipo).then(({headers, rows, filename}) => {
+    if(!rows.length){ alert('No hay datos para este reporte todavía.'); return; }
+    const esc = v => `"${String(v ?? '').replace(/"/g,'""')}"`;
+    const csv = '\uFEFF' + [headers, ...rows].map(r => r.map(esc).join(';')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
+boot();
+</script>
+</body>
+</html>
